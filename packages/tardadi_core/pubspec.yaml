@@ -1,0 +1,17 @@
+name: tardadi_core
+description: Shared models, API client, and brand tokens for Tardadi apps.
+version: 0.1.0
+publish_to: "none"
+
+environment:
+  sdk: ^3.11.5
+  flutter: ">=3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.4.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.0

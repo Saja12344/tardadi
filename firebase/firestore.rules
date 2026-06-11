@@ -1,0 +1,76 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && request.auth.token.role == 'super_admin';
+    }
+
+    function isOrgAdmin(orgId) {
+      return isSignedIn()
+        && request.auth.token.role == 'organization_admin'
+        && request.auth.token.organizationId == orgId;
+    }
+
+    function isOrgUser(orgId) {
+      return isSignedIn() && request.auth.token.organizationId == orgId;
+    }
+
+    match /organizations/{orgId} {
+      allow read: if true;
+      allow create, update, delete: if isSuperAdmin();
+
+      match /organization_admins/{docId} {
+        allow read: if isSuperAdmin() || isOrgAdmin(orgId);
+        allow write: if isSuperAdmin();
+      }
+
+      match /users/{docId} {
+        allow read: if isSuperAdmin() || isOrgAdmin(orgId) || isOrgUser(orgId);
+        allow write: if isSuperAdmin() || isOrgAdmin(orgId);
+      }
+
+      match /drivers/{docId} {
+        allow read: if true;
+        allow write: if isSuperAdmin() || isOrgAdmin(orgId);
+      }
+
+      match /buses/{docId} {
+        allow read: if true;
+        allow write: if isSuperAdmin() || isOrgAdmin(orgId);
+      }
+
+      match /routes/{routeId} {
+        allow read: if true;
+        allow write: if isSuperAdmin() || isOrgAdmin(orgId);
+
+        match /stops/{stopId} {
+          allow read: if true;
+          allow write: if isSuperAdmin() || isOrgAdmin(orgId);
+        }
+      }
+
+      match /trips/{tripId} {
+        allow read: if true;
+        allow write: if isSuperAdmin() || isOrgAdmin(orgId);
+
+        match /gps_logs/{logId} {
+          allow read: if true;
+          allow create: if isSuperAdmin() || isOrgAdmin(orgId) || isOrgUser(orgId);
+          allow update, delete: if false;
+        }
+      }
+
+      match /reminders/{reminderId} {
+        allow read: if true;
+        allow create: if true;
+        allow update: if true;
+        allow delete: if isSuperAdmin() || isOrgAdmin(orgId);
+      }
+    }
+  }
+}

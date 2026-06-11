@@ -1,0 +1,23 @@
+{
+  "name": "tardadi",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ترددي — Bus tracking: Driver, Passenger, Admin",
+  "workspaces": [
+    "packages/shared",
+    "apps/admin",
+    "firebase/functions"
+  ],
+  "scripts": {
+    "build:shared": "npm run build -w @tardadi/shared",
+    "build:functions": "npm run build -w @tardadi/functions",
+    "dev:admin": "npm run dev -w @tardadi/admin",
+    "dev:driver": "cd apps/driver && flutter run",
+    "dev:passenger": "cd apps/passenger && flutter run",
+    "emulators": "firebase emulators:start --only firestore,functions",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
