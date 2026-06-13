@@ -19,10 +19,13 @@
     "dev:passenger:ios": "bash scripts/run-passenger-ios.sh",
     "dev:backend": "bash scripts/dev-backend.sh",
     "setup": "bash scripts/setup-dev.sh",
-    "emulators": "firebase emulators:start --only firestore,functions",
+    "emulators": "npx firebase emulators:start --only firestore,functions",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "firebase-tools": "^15.20.0"
   }
 }
