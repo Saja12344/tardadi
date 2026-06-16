@@ -12,27 +12,24 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _api = TardadiApi();
-  final _driverCodeController = TextEditingController(text: 'DRV-102');
-  final _busIdController = TextEditingController();
+  final _phoneController = TextEditingController();
   bool _loading = false;
 
   Future<void> _login() async {
-    if (_driverCodeController.text.isEmpty || _busIdController.text.isEmpty) {
-      _showError('أدخل كود السائق ومعرّف الباص');
+    final phone = _phoneController.text.trim();
+    if (phone.isEmpty) {
+      _showError('أدخل رقم الجوال');
       return;
     }
 
     setState(() => _loading = true);
     try {
-      final session = await _api.driverLogin(
-        driverCode: _driverCodeController.text.trim(),
-        busId: _busIdController.text.trim(),
-      );
+      final session = await _api.driverLogin(phone: phone);
       SessionStore.instance.set(session);
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/map');
     } catch (error) {
-      _showError(error.toString());
+      _showError(error.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -65,18 +62,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 'تطبيق السائق',
                 style: TextStyle(color: TardadiBrand.grey),
               ),
+              const SizedBox(height: 8),
+              const Text(
+                'أدخل رقم جوالك المسجّل من الإدارة',
+                style: TextStyle(color: TardadiBrand.grey, fontSize: 14),
+              ),
               const SizedBox(height: 32),
               TextField(
-                controller: _driverCodeController,
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                textDirection: TextDirection.ltr,
                 decoration: const InputDecoration(
-                  hintText: 'كود السائق',
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _busIdController,
-                decoration: const InputDecoration(
-                  hintText: 'معرّف الباص (busId من Admin)',
+                  hintText: '05xxxxxxxx',
+                  prefixIcon: Icon(Icons.phone_outlined),
                 ),
               ),
               const SizedBox(height: 20),

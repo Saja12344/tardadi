@@ -28,7 +28,7 @@
       "collectionGroup": "drivers",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "driverCode", "order": "ASCENDING" },
+        { "fieldPath": "phone", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" }
       ]
     },

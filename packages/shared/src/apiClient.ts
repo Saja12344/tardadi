@@ -6,14 +6,27 @@ export class TardadiApiClient {
     private organizationId: string
   ) {}
 
+  private buildUrl(path: string, extraQuery?: Record<string, string>): string {
+    const base = this.baseUrl.replace(/\/$/, "");
+    const [pathname, search = ""] = path.split("?");
+    const params = new URLSearchParams(search);
+    params.set("organizationId", this.organizationId);
+
+    if (extraQuery) {
+      for (const [key, value] of Object.entries(extraQuery)) {
+        params.set(key, value);
+      }
+    }
+
+    return `${base}${pathname}?${params.toString()}`;
+  }
+
   private async request<T>(
     path: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    extraQuery?: Record<string, string>
   ): Promise<T> {
-    const url = new URL(path, this.baseUrl);
-    url.searchParams.set("organizationId", this.organizationId);
-
-    const response = await fetch(url.toString(), {
+    const response = await fetch(this.buildUrl(path, extraQuery), {
       ...options,
       headers: {
         "Content-Type": "application/json",
@@ -38,8 +51,11 @@ export class TardadiApiClient {
   }
 
   getBuses(activeOnly = false) {
-    const path = activeOnly ? "/api/buses?active=true" : "/api/buses";
-    return this.request(path);
+    return this.request(
+      "/api/buses",
+      {},
+      activeOnly ? { active: "true" } : undefined
+    );
   }
 
   getDrivers() {
@@ -47,23 +63,25 @@ export class TardadiApiClient {
   }
 
   getDriverMe(driverId: string) {
-    return this.request(`/api/drivers/me?driverId=${driverId}`);
+    return this.request("/api/drivers/me", {}, { driverId });
   }
 
-  driverLogin(driverCode: string, busId: string) {
+  driverLogin(phone: string) {
     return this.request("/api/auth/driver-login", {
       method: "POST",
       body: JSON.stringify({
         organizationId: this.organizationId,
-        driverCode,
-        busId,
+        phone,
       }),
     });
   }
 
   getTrips(status?: string) {
-    const path = status ? `/api/trips?status=${status}` : "/api/trips";
-    return this.request(path);
+    return this.request(
+      "/api/trips",
+      {},
+      status ? { status } : undefined
+    );
   }
 
   startTrip(driverId: string, busId: string, routeId: string) {
@@ -108,10 +126,11 @@ export class TardadiApiClient {
   }
 
   getReminders(userId?: string) {
-    const path = userId
-      ? `/api/reminders?userId=${userId}`
-      : "/api/reminders";
-    return this.request(path);
+    return this.request(
+      "/api/reminders",
+      {},
+      userId ? { userId } : undefined
+    );
   }
 
   createReminder(payload: {

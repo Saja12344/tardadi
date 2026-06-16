@@ -62,10 +62,36 @@ router.get("/:routeId", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const orgId = getOrgId(req);
-    const { name, code, colorHex, status = "active", polyline } = req.body;
+    const {
+      name,
+      code,
+      colorHex,
+      status = "active",
+      polyline,
+      fromLocation,
+      toLocation,
+    } = req.body;
 
     if (!name || !code) {
       fail(res, "name and code are required");
+      return;
+    }
+
+    if (
+      !fromLocation?.address ||
+      typeof fromLocation.latitude !== "number" ||
+      typeof fromLocation.longitude !== "number"
+    ) {
+      fail(res, "fromLocation (address, latitude, longitude) is required");
+      return;
+    }
+
+    if (
+      !toLocation?.address ||
+      typeof toLocation.latitude !== "number" ||
+      typeof toLocation.longitude !== "number"
+    ) {
+      fail(res, "toLocation (address, latitude, longitude) is required");
       return;
     }
 
@@ -79,12 +105,27 @@ router.post("/", async (req, res) => {
         code,
         colorHex: colorHex || "#FF6B00",
         status,
+        fromLocation,
+        toLocation,
         polyline: polyline || null,
         createdAt: now,
         updatedAt: now,
       });
 
-    ok(res, { routeId: docRef.id, organizationId: orgId, name, code, colorHex, status }, 201);
+    ok(
+      res,
+      {
+        routeId: docRef.id,
+        organizationId: orgId,
+        name,
+        code,
+        colorHex: colorHex || "#FF6B00",
+        status,
+        fromLocation,
+        toLocation,
+      },
+      201
+    );
   } catch (error) {
     fail(res, (error as Error).message, 500);
   }

@@ -8,6 +8,13 @@ export interface GeoPoint {
   longitude: number;
 }
 
+/** Named place with coordinates — used for route from/to endpoints. */
+export interface LocationPlace {
+  address: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface Organization {
   organizationId: string;
   name: string;
@@ -21,9 +28,9 @@ export interface Organization {
 export interface Driver {
   driverId: string;
   organizationId: string;
-  driverCode: string;
   name: string;
-  phone?: string;
+  phone: string;
+  driverCode?: string;
   assignedRouteId?: string;
   assignedBusId?: string;
   status: EntityStatus;
@@ -51,6 +58,8 @@ export interface Route {
   code: string;
   colorHex: string;
   status: EntityStatus;
+  fromLocation?: LocationPlace | null;
+  toLocation?: LocationPlace | null;
   polyline?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -108,8 +117,7 @@ export interface Reminder {
 
 export interface DriverLoginRequest {
   organizationId: string;
-  driverCode: string;
-  busId: string;
+  phone: string;
 }
 
 export interface DriverLoginResponse {

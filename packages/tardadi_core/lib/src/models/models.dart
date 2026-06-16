@@ -91,16 +91,18 @@ class BusModel {
 class DriverModel {
   const DriverModel({
     required this.driverId,
-    required this.driverCode,
     required this.name,
+    required this.phone,
+    this.driverCode,
     this.assignedRouteId,
     this.assignedBusId,
     required this.status,
   });
 
   final String driverId;
-  final String driverCode;
   final String name;
+  final String phone;
+  final String? driverCode;
   final String? assignedRouteId;
   final String? assignedBusId;
   final String status;
@@ -108,8 +110,9 @@ class DriverModel {
   factory DriverModel.fromJson(Map<String, dynamic> json) {
     return DriverModel(
       driverId: json['driverId'] as String? ?? json['id'] as String? ?? '',
-      driverCode: json['driverCode'] as String? ?? '',
       name: json['name'] as String? ?? '',
+      phone: json['phone'] as String? ?? '',
+      driverCode: json['driverCode'] as String?,
       assignedRouteId: json['assignedRouteId'] as String?,
       assignedBusId: json['assignedBusId'] as String?,
       status: json['status'] as String? ?? 'active',

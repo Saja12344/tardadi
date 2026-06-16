@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { COLLECTIONS } from "@tardadi/shared";
+import { COLLECTIONS, normalizePhone } from "@tardadi/shared";
 import { db } from "../firebase";
 import { fail, getOrgId, ok } from "../utils";
 
@@ -59,7 +59,6 @@ router.post("/", async (req, res) => {
   try {
     const orgId = getOrgId(req);
     const {
-      driverCode,
       name,
       phone,
       assignedRouteId,
@@ -67,8 +66,23 @@ router.post("/", async (req, res) => {
       status = "active",
     } = req.body;
 
-    if (!driverCode || !name) {
-      fail(res, "driverCode and name are required");
+    if (!name || !phone) {
+      fail(res, "name and phone are required");
+      return;
+    }
+
+    const normalizedPhone = normalizePhone(phone);
+
+    const existing = await db
+      .collection(COLLECTIONS.organizations)
+      .doc(orgId)
+      .collection(COLLECTIONS.drivers)
+      .where("phone", "==", normalizedPhone)
+      .limit(1)
+      .get();
+
+    if (!existing.empty) {
+      fail(res, "رقم الجوال مسجل مسبقاً", 409);
       return;
     }
 
@@ -78,9 +92,9 @@ router.post("/", async (req, res) => {
       .doc(orgId)
       .collection(COLLECTIONS.drivers)
       .add({
-        driverCode,
         name,
-        phone: phone || null,
+        phone: normalizedPhone,
+        driverCode: null,
         assignedRouteId: assignedRouteId || null,
         assignedBusId: assignedBusId || null,
         status,
@@ -93,8 +107,8 @@ router.post("/", async (req, res) => {
       {
         driverId: docRef.id,
         organizationId: orgId,
-        driverCode,
         name,
+        phone: normalizedPhone,
         assignedRouteId,
         assignedBusId,
         status,
@@ -113,6 +127,10 @@ router.put("/:driverId", async (req, res) => {
     const updates = { ...req.body, updatedAt: new Date().toISOString() };
     delete updates.organizationId;
     delete updates.driverId;
+
+    if (updates.phone) {
+      updates.phone = normalizePhone(updates.phone);
+    }
 
     await db
       .collection(COLLECTIONS.organizations)

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { COLLECTIONS } from "@tardadi/shared";
+import { COLLECTIONS, normalizePhone } from "@tardadi/shared";
 import type { Driver, Bus, Route, Stop } from "@tardadi/shared";
 import { db } from "../firebase";
 import { fail, getOrgId, ok } from "../utils";
@@ -9,24 +9,26 @@ const router = Router();
 router.post("/driver-login", async (req, res) => {
   try {
     const orgId = getOrgId(req);
-    const { driverCode, busId } = req.body;
+    const { phone } = req.body;
 
-    if (!driverCode || !busId) {
-      fail(res, "driverCode and busId are required");
+    if (!phone) {
+      fail(res, "phone is required");
       return;
     }
+
+    const normalizedPhone = normalizePhone(phone);
 
     const driversSnapshot = await db
       .collection(COLLECTIONS.organizations)
       .doc(orgId)
       .collection(COLLECTIONS.drivers)
-      .where("driverCode", "==", driverCode)
+      .where("phone", "==", normalizedPhone)
       .where("status", "==", "active")
       .limit(1)
       .get();
 
     if (driversSnapshot.empty) {
-      fail(res, "Invalid driver code", 401);
+      fail(res, "رقم الجوال غير مسجل. تواصل مع الإدارة.", 401);
       return;
     }
 
@@ -35,16 +37,16 @@ router.post("/driver-login", async (req, res) => {
     const driver: Driver = {
       driverId: driverDoc.id,
       organizationId: orgId,
-      driverCode: driverData.driverCode,
       name: driverData.name,
       phone: driverData.phone,
+      driverCode: driverData.driverCode,
       assignedRouteId: driverData.assignedRouteId,
       assignedBusId: driverData.assignedBusId,
       status: driverData.status,
     };
 
-    if (driver.assignedBusId && driver.assignedBusId !== busId) {
-      fail(res, "Bus not assigned to this driver", 403);
+    if (!driver.assignedRouteId || !driver.assignedBusId) {
+      fail(res, "لم يتم تعيين خط أو باص لك بعد. تواصل مع الإدارة.", 403);
       return;
     }
 
@@ -52,11 +54,11 @@ router.post("/driver-login", async (req, res) => {
       .collection(COLLECTIONS.organizations)
       .doc(orgId)
       .collection(COLLECTIONS.buses)
-      .doc(busId)
+      .doc(driver.assignedBusId)
       .get();
 
     if (!busDoc.exists) {
-      fail(res, "Bus not found", 404);
+      fail(res, "الباص المعيّن غير موجود", 404);
       return;
     }
 
@@ -66,11 +68,6 @@ router.post("/driver-login", async (req, res) => {
       ...(busDoc.data() as Omit<Bus, "busId" | "organizationId">),
     };
 
-    if (!driver.assignedRouteId) {
-      fail(res, "Driver has no assigned route", 403);
-      return;
-    }
-
     const routeDoc = await db
       .collection(COLLECTIONS.organizations)
       .doc(orgId)
@@ -79,7 +76,7 @@ router.post("/driver-login", async (req, res) => {
       .get();
 
     if (!routeDoc.exists) {
-      fail(res, "Assigned route not found", 404);
+      fail(res, "الخط المعيّن غير موجود", 404);
       return;
     }
 

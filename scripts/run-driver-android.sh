@@ -16,23 +16,11 @@ if [[ -n "${ANDROID_HOME:-}" ]]; then
   export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
 fi
 
-cd "$ROOT/apps/passenger"
+cd "$ROOT/apps/driver"
 flutter pub get
 
 if ! command -v emulator >/dev/null 2>&1; then
   echo "Android emulator not found."
-  echo "Run: brew install --cask android-studio android-commandlinetools"
-  echo "Fallback: npm run dev:passenger:ios"
-  exit 1
-fi
-
-if [[ -z "$ANDROID_AVD" ]]; then
-  ANDROID_AVD="$(emulator -list-avds | head -1)"
-fi
-
-if [[ -z "$ANDROID_AVD" ]]; then
-  echo "No Android AVD found. Create one with:"
-  echo "  avdmanager create avd -n Tardadi_Passenger -k \"system-images;android-34;google_apis;arm64-v8a\" -d pixel_7"
   exit 1
 fi
 
@@ -40,7 +28,6 @@ if ! adb devices 2>/dev/null | grep -q "emulator"; then
   echo "Starting Android emulator: $ANDROID_AVD"
   nohup emulator -avd "$ANDROID_AVD" -no-snapshot-load >/tmp/tardadi-emulator.log 2>&1 &
   adb wait-for-device
-  echo "Android emulator is ready."
 fi
 
 DEVICE_ID="$(adb devices 2>/dev/null | awk '/emulator-/{print $1; exit}')"
@@ -50,5 +37,5 @@ if [[ -z "$DEVICE_ID" ]]; then
   exit 1
 fi
 
-echo "Running Passenger app on $DEVICE_ID"
+echo "Running Driver app on $DEVICE_ID"
 flutter run -d "$DEVICE_ID"

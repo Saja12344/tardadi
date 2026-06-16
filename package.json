@@ -14,6 +14,7 @@
     "dev:admin": "npm run dev -w @tardadi/admin",
     "dev:driver": "bash scripts/run-driver-ios.sh",
     "dev:driver:ios": "bash scripts/run-driver-ios.sh",
+    "dev:driver:android": "bash scripts/run-driver-android.sh",
     "dev:passenger": "bash scripts/run-passenger-android.sh",
     "dev:passenger:android": "bash scripts/run-passenger-android.sh",
     "dev:passenger:ios": "bash scripts/run-passenger-ios.sh",

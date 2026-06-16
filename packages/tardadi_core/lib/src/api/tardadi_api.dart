@@ -84,16 +84,14 @@ class TardadiApi {
   }
 
   Future<DriverSession> driverLogin({
-    required String driverCode,
-    required String busId,
+    required String phone,
   }) {
     return _request(
       '/api/auth/driver-login',
       method: 'POST',
       body: {
         'organizationId': _config.organizationId,
-        'driverCode': driverCode,
-        'busId': busId,
+        'phone': phone,
       },
       parser: (data) {
         final map = data as Map<String, dynamic>;
