@@ -6,8 +6,7 @@ import '../config/app_config.dart';
 import '../models/models.dart';
 
 class TardadiApi {
-  TardadiApi({AppConfig? config})
-      : _config = config ?? const AppConfig();
+  TardadiApi({AppConfig? config}) : _config = config ?? AppConfig.dev();
 
   final AppConfig _config;
 
