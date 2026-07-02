@@ -5,8 +5,18 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 IOS_DEVICE_NAME="${IOS_DEVICE_NAME:-iPhone 17 Pro}"
 IOS_DEVICE_ID="${IOS_DEVICE_ID:-}"
 
+if [[ -d "/Applications/Xcode.app/Contents/Developer" ]]; then
+  export DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"
+fi
+
+export PATH="$ROOT/scripts/ios-bin:$PATH"
+
 cd "$ROOT/apps/driver"
 flutter pub get
+
+if [[ -d ios ]]; then
+  (cd ios && pod install)
+fi
 
 if [[ -z "$IOS_DEVICE_ID" ]]; then
   IOS_DEVICE_ID="$(xcrun simctl list devices available \

@@ -9,8 +9,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   cupertino_icons: ^1.0.8
   geolocator: ^14.0.2
+  google_fonts: ^6.2.1
   tardadi_core:
     path: ../../packages/tardadi_core
 
@@ -21,3 +24,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/logo_icon.png
+    - assets/images/logo_full.png
+    - assets/images/onboarding_map.png
