@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { Query } from "firebase-admin/firestore";
 import { COLLECTIONS } from "@tardadi/shared";
 import { db } from "../firebase";
 import { fail, getOrgId, ok } from "../utils";
@@ -10,7 +11,7 @@ router.get("/", async (req, res) => {
     const orgId = getOrgId(req);
     const activeOnly = req.query.active === "true";
 
-    let query: FirebaseFirestore.Query = db
+    let query: Query = db
       .collection(COLLECTIONS.organizations)
       .doc(orgId)
       .collection(COLLECTIONS.buses);

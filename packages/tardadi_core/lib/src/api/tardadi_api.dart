@@ -6,8 +6,7 @@ import '../config/app_config.dart';
 import '../models/models.dart';
 
 class TardadiApi {
-  TardadiApi({AppConfig? config})
-      : _config = config ?? const AppConfig();
+  TardadiApi({AppConfig? config}) : _config = config ?? AppConfig.dev();
 
   final AppConfig _config;
 
@@ -177,7 +176,7 @@ class TardadiApi {
     );
   }
 
-  Future<void> createReminder({
+  Future<String> createReminder({
     required String userId,
     required String busId,
     required String routeId,
@@ -197,6 +196,14 @@ class TardadiApi {
         'fcmToken': fcmToken,
         'notifyWhenMinutesAway': notifyWhenMinutesAway,
       },
+      parser: (data) => (data as Map<String, dynamic>)['reminderId'] as String,
+    );
+  }
+
+  Future<void> cancelReminder(String reminderId) {
+    return _request(
+      '/api/reminders/$reminderId',
+      method: 'DELETE',
       parser: (_) {},
     );
   }

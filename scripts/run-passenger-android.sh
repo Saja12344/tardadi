@@ -36,19 +36,26 @@ if [[ -z "$ANDROID_AVD" ]]; then
   exit 1
 fi
 
-if ! adb devices 2>/dev/null | grep -q "emulator"; then
+if ! adb devices 2>/dev/null | grep -qE '^emulator-'; then
   echo "Starting Android emulator: $ANDROID_AVD"
   nohup emulator -avd "$ANDROID_AVD" -no-snapshot-load >/tmp/tardadi-emulator.log 2>&1 &
-  adb wait-for-device
-  echo "Android emulator is ready."
 fi
 
-DEVICE_ID="$(adb devices 2>/dev/null | awk '/emulator-/{print $1; exit}')"
+echo "Waiting for Android emulator to boot..."
+adb wait-for-device
+for _ in $(seq 1 60); do
+  booted="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
+  if [[ "$booted" == "1" ]]; then
+    break
+  fi
+  sleep 2
+done
 
+DEVICE_ID="$(adb devices | awk '/^emulator-/{print $1; exit}')"
 if [[ -z "$DEVICE_ID" ]]; then
-  echo "No Android emulator device found."
+  echo "No Android emulator detected after boot."
   exit 1
 fi
 
-echo "Running Passenger app on $DEVICE_ID"
+echo "Running passenger app on $DEVICE_ID"
 flutter run -d "$DEVICE_ID"

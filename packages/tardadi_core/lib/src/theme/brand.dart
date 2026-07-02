@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 class TardadiBrand {
-  static const Color orange = Color(0xFFFF6B00);
-  static const Color navy = Color(0xFF1A2744);
+  static const Color orange = Color(0xFFE95026);
+  static const Color navy = Color(0xFF13154B);
   static const Color white = Color(0xFFFFFFFF);
   static const Color grey = Color(0xFF9CA3AF);
-  static const Color card = Color(0xFF243352);
+  static const Color card = Color(0xFF1A1D5C);
 
   static ThemeData darkTheme() {
     return ThemeData(

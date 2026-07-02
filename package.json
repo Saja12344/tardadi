@@ -18,6 +18,7 @@
     "dev:passenger": "bash scripts/run-passenger-android.sh",
     "dev:passenger:android": "bash scripts/run-passenger-android.sh",
     "dev:passenger:ios": "bash scripts/run-passenger-ios.sh",
+    "setup:ios": "bash scripts/setup-ios.sh",
     "dev:backend": "bash scripts/dev-backend.sh",
     "setup": "bash scripts/setup-dev.sh",
     "emulators": "npx firebase emulators:start --only firestore,functions",
