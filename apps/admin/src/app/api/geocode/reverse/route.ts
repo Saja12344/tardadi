@@ -10,7 +10,10 @@ export async function GET(request: NextRequest) {
   const coords = sanitizeCoordinates(latRaw, lngRaw);
 
   if (!coords) {
-    return NextResponse.json({ error: "Invalid coordinates" }, { status: 400 });
+    return NextResponse.json(
+      { error: "إحداثيات الموقع غير صحيحة. اختر الموقع من الخريطة مرة أخرى." },
+      { status: 400 }
+    );
   }
 
   try {

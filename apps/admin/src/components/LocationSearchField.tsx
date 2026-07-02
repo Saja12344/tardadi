@@ -135,9 +135,7 @@ export default function LocationSearchField({
       </div>
 
       <div className="location-search-wrap" ref={wrapperRef}>
-        <span className="location-search-icon" aria-hidden="true">
-          🔍
-        </span>
+        <span className="location-search-icon" aria-hidden="true" />
         <input
           className="location-search-input"
           type="text"
@@ -161,7 +159,7 @@ export default function LocationSearchField({
                 key={result.placeId ?? `${result.latitude}-${result.address}`}
               >
                 <button type="button" onClick={() => selectResult(result)}>
-                  <span className="result-pin">📍</span>
+                  <span className="result-pin" aria-hidden="true" />
                   <span className="result-text">{result.address}</span>
                 </button>
               </li>

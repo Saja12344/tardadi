@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { Bus, Driver, Route } from "@tardadi/shared";
 import { api } from "@/lib/api";
 import { adminFetch } from "@/lib/adminFetch";
+import { getUserErrorMessage } from "@/lib/errorMessage";
 
 export default function DriversPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -21,19 +22,19 @@ export default function DriversPage() {
     try {
       setRoutes((await api.getRoutes()) as Route[]);
     } catch (e) {
-      setError(`تعذر تحميل الخطوط: ${(e as Error).message}`);
+      setError(`تعذر تحميل الخطوط: ${getUserErrorMessage(e)}`);
     }
 
     try {
       setBuses((await api.getBuses()) as Bus[]);
     } catch (e) {
-      setError(`تعذر تحميل الباصات: ${(e as Error).message}`);
+      setError(`تعذر تحميل الباصات: ${getUserErrorMessage(e)}`);
     }
 
     try {
       setDrivers((await api.getDrivers()) as Driver[]);
     } catch (e) {
-      setError(`تعذر تحميل السائقين: ${(e as Error).message}`);
+      setError(`تعذر تحميل السائقين: ${getUserErrorMessage(e)}`);
     }
   }
 
@@ -58,7 +59,7 @@ export default function DriversPage() {
       setSuccess("تمت إضافة السائق. يقدر يسجّل دخوله برقم جواله في التطبيق.");
       await load();
     } catch (e) {
-      setError((e as Error).message);
+      setError(getUserErrorMessage(e));
     }
   }
 

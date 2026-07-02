@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { Bus } from "@tardadi/shared";
 import { api } from "@/lib/api";
 import { adminFetch } from "@/lib/adminFetch";
+import { getUserErrorMessage } from "@/lib/errorMessage";
 
 export default function BusesPage() {
   const [buses, setBuses] = useState<Bus[]>([]);
@@ -18,7 +19,7 @@ export default function BusesPage() {
       setBuses(data);
       setError("");
     } catch (e) {
-      setError((e as Error).message);
+      setError(getUserErrorMessage(e));
     }
   }
 
@@ -36,7 +37,7 @@ export default function BusesPage() {
       setSuccess("تمت إضافة الباص");
       await load();
     } catch (e) {
-      setError((e as Error).message);
+      setError(getUserErrorMessage(e));
     }
   }
 

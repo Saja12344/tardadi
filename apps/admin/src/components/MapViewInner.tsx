@@ -36,7 +36,7 @@ const stopIcon = L.divIcon({
 
 const busIcon = L.divIcon({
   className: "bus-marker",
-  html: `<span aria-hidden="true">🚌</span>`,
+  html: `<span class="bus-pin" aria-hidden="true"></span>`,
   iconSize: [28, 28],
   iconAnchor: [14, 14],
 });

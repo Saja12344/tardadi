@@ -13,7 +13,7 @@ async function proxyRequest(
 ): Promise<NextResponse> {
   if (!isAllowedProxyPath(pathSegments)) {
     return NextResponse.json(
-      { success: false, error: "Forbidden resource" },
+      { success: false, error: "ليس لديك صلاحية للوصول لهذا الطلب." },
       { status: 403 }
     );
   }
@@ -59,7 +59,7 @@ async function proxyRequest(
     return NextResponse.json(
       {
         success: false,
-        error: "Backend unreachable. شغّل: npm run dev:backend",
+        error: "تعذّر الاتصال بالخادم. تأكد أن الباكند شغال ثم حدّث الصفحة.",
       },
       { status: 502 }
     );

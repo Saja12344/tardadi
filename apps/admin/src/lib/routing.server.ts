@@ -25,7 +25,7 @@ export async function fetchRoadRoute(
   to: LocationPlace
 ): Promise<RoadRouteResult> {
   if (!isValidPlace(from) || !isValidPlace(to)) {
-    throw new Error("Invalid coordinates");
+    throw new Error("إحداثيات الموقع غير صحيحة. اختر الموقع من الخريطة مرة أخرى.");
   }
 
   const coords = `${from.longitude},${from.latitude};${to.longitude},${to.latitude}`;
@@ -41,7 +41,7 @@ export async function fetchRoadRoute(
   );
 
   if (!response.ok) {
-    throw new Error("Routing service unavailable");
+    throw new Error("تعذّر حساب المسار الآن. حاول مرة أخرى.");
   }
 
   const data = (await response.json()) as {
@@ -54,7 +54,7 @@ export async function fetchRoadRoute(
   };
 
   if (data.code !== "Ok" || !data.routes?.[0]) {
-    throw new Error("No road route found between these points");
+    throw new Error("لم نجد مسار طريق بين النقطتين. جرّب اختيار نقاط أقرب للطريق.");
   }
 
   const route = data.routes[0];

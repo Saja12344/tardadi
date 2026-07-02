@@ -1,4 +1,6 @@
 /** Client-side API base — all calls go through the secure BFF proxy. */
+import { getUserErrorMessage } from "./errorMessage";
+
 const PROXY_BASE = "/api/proxy";
 
 export async function adminFetch<T = unknown>(
@@ -20,8 +22,9 @@ export async function adminFetch<T = unknown>(
 
   if (!response.ok || body.success === false) {
     throw new Error(
-      body.error ||
-        `Request failed (${response.status}). تأكد أن Backend شغال: npm run dev:backend`
+      getUserErrorMessage(
+        body.error || `Request failed (${response.status})`
+      )
     );
   }
 

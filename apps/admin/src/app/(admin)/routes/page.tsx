@@ -13,6 +13,7 @@ import {
 } from "@/hooks/useRoadRoute";
 import { decodePolyline } from "@/lib/routing";
 import { routeEndpointsToMarkers, stopsToMarkers } from "@/lib/mapUtils";
+import { getUserErrorMessage } from "@/lib/errorMessage";
 
 type PanelMode = "list" | "create" | "detail";
 
@@ -68,7 +69,7 @@ export default function RoutesPage() {
       setRoutes(data);
       setError("");
     } catch (e) {
-      setError((e as Error).message);
+      setError(getUserErrorMessage(e));
     }
   }
 
@@ -84,7 +85,7 @@ export default function RoutesPage() {
       setPanelMode("detail");
       setError("");
     } catch (e) {
-      setError((e as Error).message);
+      setError(getUserErrorMessage(e));
     }
   }
 
@@ -128,7 +129,7 @@ export default function RoutesPage() {
         body: JSON.stringify({
           name,
           code,
-          colorHex: "#FF6B00",
+          colorHex: "#EB4F26",
           fromLocation,
           toLocation,
           polyline: createRoute.roadRoute.polyline,
@@ -139,7 +140,7 @@ export default function RoutesPage() {
       setPanelMode("list");
       await load();
     } catch (e) {
-      setError((e as Error).message);
+      setError(getUserErrorMessage(e));
     }
   }
 

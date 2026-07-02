@@ -7,7 +7,7 @@ export const MAP_TILES = {
 } as const;
 
 export const ROUTE_LINE = {
-  color: "#FF6B00",
+  color: "#EB4F26",
   weight: 5,
   opacity: 0.92,
 } as const;

@@ -4,7 +4,10 @@ import { resolvePlaceById } from "@/lib/geocode.server";
 export async function GET(request: NextRequest) {
   const placeId = request.nextUrl.searchParams.get("placeId")?.trim();
   if (!placeId) {
-    return NextResponse.json({ error: "placeId required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "اختر نتيجة موقع من القائمة أولًا." },
+      { status: 400 }
+    );
   }
 
   try {
@@ -12,7 +15,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(place);
   } catch (error) {
     return NextResponse.json(
-      { error: (error as Error).message || "Place not found" },
+      { error: (error as Error).message || "لم نتمكن من العثور على هذا الموقع. جرّب البحث مرة أخرى." },
       { status: 502 }
     );
   }

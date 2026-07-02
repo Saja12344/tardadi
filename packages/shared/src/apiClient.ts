@@ -1,5 +1,33 @@
 import type { ApiResponse } from "./types";
 
+const ERROR_MESSAGES: Array<[RegExp, string]> = [
+  [
+    /backend unreachable|failed to fetch|networkerror|load failed|fetch failed/i,
+    "تعذّر الاتصال بالخادم. تأكد أن الباكند شغال ثم حدّث الصفحة.",
+  ],
+  [/forbidden resource/i, "ليس لديك صلاحية للوصول لهذا الطلب."],
+  [/request failed|internal|server error/i, "صار خطأ في الخادم. حاول مرة أخرى."],
+  [/driver not found/i, "لم نجد هذا السائق."],
+  [/route not found/i, "لم نجد هذا الخط."],
+  [/trip not found/i, "لم نجد هذه الرحلة."],
+  [/phone is required/i, "اكتب رقم الجوال."],
+  [/name and phone are required/i, "اكتب اسم السائق ورقم جواله."],
+  [/plateNo and label are required/i, "اكتب رقم اللوحة واسم الباص."],
+  [/name and code are required/i, "اكتب اسم الخط وكوده."],
+  [/fromLocation .* required/i, "حدّد نقطة بداية الخط."],
+  [/toLocation .* required/i, "حدّد نقطة نهاية الخط."],
+  [/driverId, busId, and routeId are required/i, "اختر السائق والباص والخط قبل بدء الرحلة."],
+  [/tripId and driverId are required/i, "بيانات إنهاء الرحلة غير مكتملة."],
+  [/tripId, driverId, busId, latitude, and longitude are required/i, "بيانات موقع الباص غير مكتملة."],
+];
+
+function toUserMessage(message: string): string {
+  for (const [pattern, userMessage] of ERROR_MESSAGES) {
+    if (pattern.test(message)) return userMessage;
+  }
+  return message || "صار خطأ غير متوقع. حاول مرة أخرى.";
+}
+
 export class TardadiApiClient {
   constructor(
     private baseUrl: string,
@@ -26,17 +54,25 @@ export class TardadiApiClient {
     options: RequestInit = {},
     extraQuery?: Record<string, string>
   ): Promise<T> {
-    const response = await fetch(this.buildUrl(path, extraQuery), {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
-    });
+    let response: Response;
+    try {
+      response = await fetch(this.buildUrl(path, extraQuery), {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...options.headers,
+        },
+      });
+    } catch (error) {
+      throw new Error(toUserMessage((error as Error).message));
+    }
 
-    const body = (await response.json()) as ApiResponse<T>;
+    const body = (await response.json().catch(() => ({
+      success: false,
+      error: `Request failed: ${response.status}`,
+    }))) as ApiResponse<T>;
     if (!body.success || body.data === undefined) {
-      throw new Error(body.error || `Request failed: ${response.status}`);
+      throw new Error(toUserMessage(body.error || `Request failed: ${response.status}`));
     }
 
     return body.data;

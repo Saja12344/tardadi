@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { LocationPlace } from "@tardadi/shared";
+import { getUserErrorMessage } from "@/lib/errorMessage";
 
 type RoadRouteState = {
   coordinates: [number, number][];
@@ -43,7 +44,7 @@ export function useRoadRoute(
       .catch((e) => {
         if ((e as Error).name === "AbortError") return;
         setRoadRoute(null);
-        setError((e as Error).message);
+        setError(getUserErrorMessage(e));
       })
       .finally(() => setLoading(false));
 

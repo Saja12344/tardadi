@@ -25,7 +25,10 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return NextResponse.json(
+      { error: "الطلب غير صحيح. حدّث الصفحة وحاول مرة أخرى." },
+      { status: 400 }
+    );
   }
 
   const payload = body as Record<string, unknown>;
@@ -34,7 +37,7 @@ export async function POST(request: NextRequest) {
 
   if (!from || !to) {
     return NextResponse.json(
-      { error: "from and to locations are required" },
+      { error: "حدّد نقطة البداية ونقطة النهاية." },
       { status: 400 }
     );
   }
@@ -49,7 +52,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     return NextResponse.json(
-      { error: (error as Error).message || "Routing failed" },
+      { error: (error as Error).message || "تعذّر حساب المسار الآن. حاول مرة أخرى." },
       { status: 502 }
     );
   }

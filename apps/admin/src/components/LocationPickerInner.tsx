@@ -17,7 +17,7 @@ import { DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from "@/lib/mapUtils";
 const pinIcon = (color: string) =>
   L.divIcon({
     className: "location-pin-marker",
-    html: `<span class="location-pin" style="--pin-color:${color}">📍</span>`,
+    html: `<span class="location-pin" style="--pin-color:${color}"></span>`,
     iconSize: [28, 28],
     iconAnchor: [14, 28],
   });
@@ -56,7 +56,7 @@ type LocationPickerInnerProps = {
 export default function LocationPickerInner({
   label,
   hint = "ابحث عن مكان أو حرّك الدبوس على الخريطة",
-  pinColor = "#FF6B00",
+  pinColor = "#EB4F26",
   value,
   onChange,
 }: LocationPickerInnerProps) {
@@ -179,9 +179,7 @@ export default function LocationPickerInner({
       </div>
 
       <div className="location-search-wrap" ref={wrapperRef}>
-        <span className="location-search-icon" aria-hidden="true">
-          🔍
-        </span>
+        <span className="location-search-icon" aria-hidden="true" />
         <input
           className="location-search-input"
           type="text"
@@ -204,7 +202,7 @@ export default function LocationPickerInner({
                   role="option"
                   onClick={() => selectResult(result)}
                 >
-                  <span className="result-pin">📍</span>
+                  <span className="result-pin" aria-hidden="true" />
                   <span className="result-text">{result.address}</span>
                 </button>
               </li>
@@ -218,7 +216,7 @@ export default function LocationPickerInner({
       <div className="map-container location-picker-map">
         {!value && (
           <div className="location-map-hint">
-            <span>👆 اضغط على الخريطة لوضع الدبوس</span>
+            <span>اضغط على الخريطة لوضع الدبوس</span>
           </div>
         )}
         <MapContainer

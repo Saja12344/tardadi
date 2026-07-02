@@ -114,7 +114,7 @@ async function searchNominatim(query: string): Promise<SearchPlaceResult[]> {
   });
 
   if (!response.ok) {
-    throw new Error("Geocoding search failed");
+    throw new Error("تعذّر البحث عن الموقع. حاول مرة أخرى.");
   }
 
   const data = (await response.json()) as NominatimSearchResult[];
@@ -185,7 +185,7 @@ async function searchGooglePlaces(
   );
 
   if (!response.ok) {
-    throw new Error("Google Places search failed");
+    throw new Error("تعذّر البحث عن الموقع. حاول مرة أخرى.");
   }
 
   const data = (await response.json()) as {
@@ -195,7 +195,7 @@ async function searchGooglePlaces(
   };
 
   if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
-    throw new Error(data.error_message || `Google Places: ${data.status}`);
+    throw new Error("تعذّر البحث في Google Maps. حاول مرة أخرى.");
   }
 
   const predictions = data.predictions?.slice(0, 6) ?? [];
@@ -240,10 +240,10 @@ export async function searchPlaces(query: string): Promise<SearchPlaceResult[]> 
 export async function resolvePlaceById(placeId: string): Promise<LocationPlace> {
   const googleKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!googleKey) {
-    throw new Error("Place resolution requires GOOGLE_MAPS_API_KEY");
+    throw new Error("البحث المتقدم يحتاج مفتاح Google Maps API.");
   }
   const place = await resolveGooglePlace(placeId, googleKey);
-  if (!place) throw new Error("Place not found");
+  if (!place) throw new Error("لم نتمكن من العثور على هذا الموقع. جرّب البحث مرة أخرى.");
   return place;
 }
 
@@ -264,7 +264,7 @@ export async function reverseGeocode(
   });
 
   if (!response.ok) {
-    throw new Error("Reverse geocoding failed");
+    throw new Error("تعذّر تحديد العنوان.");
   }
 
   const data = (await response.json()) as NominatimReverseResult;

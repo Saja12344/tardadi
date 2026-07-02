@@ -13,6 +13,10 @@ class SessionStore {
     _session = session;
   }
 
+  void clear() {
+    _session = null;
+  }
+
   void updateTripId(String? tripId) {
     if (_session == null) return;
     _session = _session!.copyWith(tripId: tripId);
