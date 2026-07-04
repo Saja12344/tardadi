@@ -89,7 +89,6 @@ class BusArrivalItem {
           vehicleType: VehicleType.golfCar,
           arrivalLabel: '05 min',
           crowdingLabel: 'Medium',
-          isActive: true,
         ),
         BusArrivalItem(
           id: 'tkaful-van-1',
@@ -115,7 +114,6 @@ class BusArrivalItem {
         vehicleType: VehicleType.bus,
         arrivalLabel: '04 min',
         crowdingLabel: 'Medium',
-        isActive: true,
       ),
       BusArrivalItem(
         id: 'van-3',

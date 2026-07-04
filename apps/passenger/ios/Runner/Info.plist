@@ -51,6 +51,8 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>نحتاج موقعك لعرض الباصات القريبة منك</string>
+	<key>NSUserNotificationUsageDescription</key>
+	<string>نحتاج الإشعارات لتنبيهك عند اقتراب الباص من محطتك</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

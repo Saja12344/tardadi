@@ -16,6 +16,98 @@ class _MapStop {
   final double phase;
 }
 
+/// Uniform city-block grid: 4×4 blocks with even streets and intersections.
+class _MapGridLayout {
+  _MapGridLayout(Size size)
+      : pad = size.width * 0.04,
+        streetWidth = size.width * 0.052,
+        streetHeight = size.height * 0.058,
+        cols = 4,
+        rows = 4 {
+    final contentW = size.width - pad * 2;
+    final contentH = size.height - pad * 2;
+    blockW = (contentW - streetWidth * (cols - 1)) / cols;
+    blockH = (contentH - streetHeight * (rows - 1)) / rows;
+  }
+
+  final double pad;
+  final double streetWidth;
+  final double streetHeight;
+  final int cols;
+  final int rows;
+  late final double blockW;
+  late final double blockH;
+
+  Rect blockRect(int col, int row) {
+    return Rect.fromLTWH(
+      pad + col * (blockW + streetWidth),
+      pad + row * (blockH + streetHeight),
+      blockW,
+      blockH,
+    );
+  }
+
+  /// Center of the crossing between blocks `(col, row)` and `(col + 1, row + 1)`.
+  Offset intersection(int col, int row) {
+    return Offset(
+      pad + (col + 1) * blockW + (col + 0.5) * streetWidth,
+      pad + (row + 1) * blockH + (row + 0.5) * streetHeight,
+    );
+  }
+
+  List<Rect> allBlocks() {
+    return [
+      for (var row = 0; row < rows; row++)
+        for (var col = 0; col < cols; col++) blockRect(col, row),
+    ];
+  }
+
+  List<Rect> verticalStreets() {
+    return [
+      for (var i = 0; i < cols - 1; i++)
+        Rect.fromLTWH(
+          pad + (i + 1) * blockW + i * streetWidth,
+          pad,
+          streetWidth,
+          rows * blockH + (rows - 1) * streetHeight,
+        ),
+    ];
+  }
+
+  List<Rect> horizontalStreets() {
+    return [
+      for (var i = 0; i < rows - 1; i++)
+        Rect.fromLTWH(
+          pad,
+          pad + (i + 1) * blockH + i * streetHeight,
+          cols * blockW + (cols - 1) * streetWidth,
+          streetHeight,
+        ),
+    ];
+  }
+
+  /// Route A → B → C along street centers (L-shaped path).
+  List<Offset> routePoints() {
+    final a = intersection(0, 0);
+    final b = intersection(1, 1);
+    final c = intersection(2, 2);
+    return [
+      a,
+      Offset(a.dx, b.dy),
+      b,
+      Offset(b.dx, c.dy),
+      c,
+    ];
+  }
+
+  List<Offset> routeFractions(Size size) {
+    return [
+      for (final point in routePoints())
+        Offset(point.dx / size.width, point.dy / size.height),
+    ];
+  }
+}
+
 class MapIllustration extends StatefulWidget {
   const MapIllustration({
     super.key,
@@ -34,20 +126,6 @@ class _MapIllustrationState extends State<MapIllustration>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
-  static const _routeFractions = [
-    Offset(0.30, 0.24),
-    Offset(0.30, 0.50),
-    Offset(0.50, 0.50),
-    Offset(0.50, 0.78),
-    Offset(0.78, 0.78),
-  ];
-
-  static final _stops = [
-    _MapStop(label: 'A', point: _routeFractions[0], phase: 0.0),
-    _MapStop(label: 'B', point: _routeFractions[2], phase: 0.33),
-    _MapStop(label: 'C', point: _routeFractions[4], phase: 0.66),
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -63,11 +141,18 @@ class _MapIllustrationState extends State<MapIllustration>
     super.dispose();
   }
 
-  List<Offset> _routePoints(Size size) {
+  List<_MapStop> _stopsFor(Size size) {
+    final grid = _MapGridLayout(size);
+    final fractions = grid.routeFractions(size);
     return [
-      for (final fraction in _routeFractions)
-        Offset(fraction.dx * size.width, fraction.dy * size.height),
+      _MapStop(label: 'A', point: fractions[0], phase: 0.0),
+      _MapStop(label: 'B', point: fractions[2], phase: 0.33),
+      _MapStop(label: 'C', point: fractions[4], phase: 0.66),
     ];
+  }
+
+  List<Offset> _routePoints(Size size) {
+    return _MapGridLayout(size).routePoints();
   }
 
   @override
@@ -84,6 +169,7 @@ class _MapIllustrationState extends State<MapIllustration>
           builder: (context, _) {
             final size = Size(widget.width, widget.height);
             final routePoints = _routePoints(size);
+            final stops = _stopsFor(size);
             final logoCenter = _pointOnPolyline(routePoints, _controller.value);
             final logoAngle = _segmentAngleAt(routePoints, _controller.value);
 
@@ -94,8 +180,7 @@ class _MapIllustrationState extends State<MapIllustration>
                   size: size,
                   painter: _MapIllustrationPainter(
                     progress: _controller.value,
-                    routeFractions: _routeFractions,
-                    stops: _stops,
+                    stops: stops,
                   ),
                 ),
                 Positioned(
@@ -122,12 +207,10 @@ class _MapIllustrationState extends State<MapIllustration>
 class _MapIllustrationPainter extends CustomPainter {
   _MapIllustrationPainter({
     required this.progress,
-    required this.routeFractions,
     required this.stops,
   });
 
   final double progress;
-  final List<Offset> routeFractions;
   final List<_MapStop> stops;
 
   static const _blockColor = Color(0xFFC8CDD8);
@@ -135,19 +218,17 @@ class _MapIllustrationPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final grid = _MapGridLayout(size);
+
     canvas.drawRect(
       Offset.zero & size,
       Paint()..color = OnboardingTheme.background,
     );
 
-    _drawBlocks(canvas, size);
-    _drawStreets(canvas, size);
+    _drawBlocks(canvas, grid);
+    _drawStreets(canvas, grid);
 
-    final routePoints = [
-      for (final fraction in routeFractions)
-        Offset(fraction.dx * size.width, fraction.dy * size.height),
-    ];
-
+    final routePoints = grid.routePoints();
     _drawAnimatedRoute(canvas, routePoints, progress);
 
     for (final stop in stops) {
@@ -165,49 +246,21 @@ class _MapIllustrationPainter extends CustomPainter {
     }
   }
 
-  void _drawBlocks(Canvas canvas, Size size) {
+  void _drawBlocks(Canvas canvas, _MapGridLayout grid) {
     final paint = Paint()..color = _blockColor;
-    final blocks = [
-      Rect.fromLTWH(size.width * 0.04, size.height * 0.04, size.width * 0.22, size.height * 0.16),
-      Rect.fromLTWH(size.width * 0.36, size.height * 0.04, size.width * 0.24, size.height * 0.14),
-      Rect.fromLTWH(size.width * 0.68, size.height * 0.04, size.width * 0.26, size.height * 0.18),
-      Rect.fromLTWH(size.width * 0.04, size.height * 0.28, size.width * 0.20, size.height * 0.18),
-      Rect.fromLTWH(size.width * 0.56, size.height * 0.24, size.width * 0.18, size.height * 0.20),
-      Rect.fromLTWH(size.width * 0.78, size.height * 0.28, size.width * 0.18, size.height * 0.16),
-      Rect.fromLTWH(size.width * 0.04, size.height * 0.56, size.width * 0.20, size.height * 0.18),
-      Rect.fromLTWH(size.width * 0.56, size.height * 0.56, size.width * 0.18, size.height * 0.16),
-      Rect.fromLTWH(size.width * 0.78, size.height * 0.52, size.width * 0.18, size.height * 0.20),
-      Rect.fromLTWH(size.width * 0.04, size.height * 0.82, size.width * 0.38, size.height * 0.12),
-      Rect.fromLTWH(size.width * 0.58, size.height * 0.82, size.width * 0.36, size.height * 0.12),
-    ];
+    final radius = Radius.circular(grid.blockW.clamp(4.0, 8.0));
 
-    for (final block in blocks) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(block, const Radius.circular(6)),
-        paint,
-      );
+    for (final block in grid.allBlocks()) {
+      canvas.drawRRect(RRect.fromRectAndRadius(block, radius), paint);
     }
   }
 
-  void _drawStreets(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = _streetColor
-      ..style = PaintingStyle.fill;
+  void _drawStreets(Canvas canvas, _MapGridLayout grid) {
+    final paint = Paint()..color = _streetColor;
+    const radius = Radius.circular(3);
 
-    final streets = [
-      Rect.fromLTWH(size.width * 0.26, size.height * 0.04, size.width * 0.08, size.height * 0.92),
-      Rect.fromLTWH(size.width * 0.48, size.height * 0.04, size.width * 0.06, size.height * 0.92),
-      Rect.fromLTWH(size.width * 0.72, size.height * 0.04, size.width * 0.04, size.height * 0.92),
-      Rect.fromLTWH(size.width * 0.04, size.height * 0.20, size.width * 0.92, size.height * 0.06),
-      Rect.fromLTWH(size.width * 0.04, size.height * 0.44, size.width * 0.92, size.height * 0.06),
-      Rect.fromLTWH(size.width * 0.04, size.height * 0.70, size.width * 0.92, size.height * 0.06),
-    ];
-
-    for (final street in streets) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(street, const Radius.circular(4)),
-        paint,
-      );
+    for (final street in [...grid.verticalStreets(), ...grid.horizontalStreets()]) {
+      canvas.drawRRect(RRect.fromRectAndRadius(street, radius), paint);
     }
   }
 

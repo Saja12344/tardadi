@@ -22,9 +22,8 @@ class _AccountTypeScreenState extends State<AccountTypeScreen> {
   AccountType _selected = AccountType.personal;
 
   void _continue() {
-    UserSession.instance.setAccountType(_selected);
-
     if (_selected == AccountType.personal) {
+      UserSession.instance.setAccountType(AccountType.personal);
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(builder: (_) => const RoutesMainScreen()),
       );

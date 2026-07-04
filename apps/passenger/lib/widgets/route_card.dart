@@ -4,7 +4,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'onboarding/frosted_glass.dart';
 import 'onboarding/onboarding_scale.dart';
 import 'onboarding/onboarding_theme.dart';
 
@@ -28,6 +27,45 @@ class RouteCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scale = OnboardingScale(context);
     final isRtl = Directionality.of(context) == TextDirection.rtl;
+
+    final arrow = Container(
+      width: scale.s(34),
+      height: scale.s(34),
+      decoration: BoxDecoration(
+        color: OnboardingTheme.orange,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: OnboardingTheme.orange.withValues(alpha: 0.35),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Icon(
+        isRtl
+            ? Icons.arrow_back_ios_new_rounded
+            : Icons.arrow_forward_ios_rounded,
+        color: Colors.white,
+        size: scale.s(16),
+      ),
+    );
+
+    final title = Expanded(
+      child: Text(
+        name,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        textAlign: isRtl ? TextAlign.right : TextAlign.left,
+        style: GoogleFonts.ubuntu(
+          fontSize: scale.s(22),
+          fontWeight: FontWeight.w700,
+          color: OnboardingTheme.routeTitle,
+          height: 1.15,
+          letterSpacing: -0.2,
+        ),
+      ),
+    );
 
     return Padding(
       padding: EdgeInsets.only(bottom: scale.s(12)),
@@ -84,48 +122,22 @@ class RouteCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                name,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.ubuntu(
-                                  fontSize: scale.s(22),
-                                  fontWeight: FontWeight.w700,
-                                  color: OnboardingTheme.routeTitle,
-                                  height: 1.15,
-                                  letterSpacing: -0.2,
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: scale.s(10)),
-                            Container(
-                              width: scale.s(34),
-                              height: scale.s(34),
-                              decoration: BoxDecoration(
-                                color: OnboardingTheme.orange,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: OnboardingTheme.orange
-                                        .withValues(alpha: 0.35),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: Icon(
-                                isRtl
-                                    ? Icons.arrow_back_ios_new_rounded
-                                    : Icons.arrow_forward_ios_rounded,
-                                color: Colors.white,
-                                size: scale.s(16),
-                              ),
-                            ),
-                          ],
+                        Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: isRtl
+                                ? [
+                                    arrow,
+                                    SizedBox(width: scale.s(10)),
+                                    title,
+                                  ]
+                                : [
+                                    title,
+                                    SizedBox(width: scale.s(10)),
+                                    arrow,
+                                  ],
+                          ),
                         ),
                         SizedBox(height: scale.s(14)),
                         Container(
@@ -270,111 +282,94 @@ class AccountTypeOption extends StatelessWidget {
             curve: Curves.easeOutCubic,
             width: double.infinity,
             constraints: BoxConstraints(minHeight: scale.s(118)),
+            padding: EdgeInsets.symmetric(
+              horizontal: scale.s(16),
+              vertical: scale.s(14),
+            ),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
-              boxShadow: selected
-                  ? [
-                      BoxShadow(
-                        color: OnboardingTheme.orange.withValues(alpha: 0.22),
-                        blurRadius: 18,
-                        offset: const Offset(0, 8),
-                      ),
-                    ]
-                  : [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.14),
-                        blurRadius: 14,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-            ),
-            child: FrostedGlass(
-              variant: FrostedGlassVariant.dark,
-              tintColor: const Color(0xFFD9D9D9),
-              borderRadius: 18,
-              padding: EdgeInsets.symmetric(
-                horizontal: scale.s(16),
-                vertical: scale.s(14),
-              ),
+              color: selected
+                  ? Colors.white.withValues(alpha: 0.10)
+                  : Colors.white.withValues(alpha: 0.05),
               border: Border.all(
                 color: selected
                     ? OnboardingTheme.orange
-                    : Colors.white.withValues(alpha: 0.18),
+                    : Colors.white.withValues(alpha: 0.14),
                 width: selected ? 2 : 1,
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Container(
-                    width: scale.s(58),
-                    height: scale.s(58),
-                    decoration: BoxDecoration(
-                      color: OnboardingTheme.orange.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: OnboardingTheme.orange.withValues(alpha: 0.28),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: scale.s(58),
+                  height: scale.s(58),
+                  decoration: BoxDecoration(
+                    color: OnboardingTheme.orange.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: OnboardingTheme.orange.withValues(alpha: 0.28),
+                    ),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: OnboardingTheme.orange,
+                    size: scale.s(30),
+                  ),
+                ),
+                SizedBox(width: scale.s(14)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.ubuntu(
+                          color: OnboardingTheme.orange,
+                          fontSize: titleSize,
+                          fontWeight: FontWeight.w700,
+                          height: 1.15,
+                        ),
                       ),
-                    ),
-                    child: Icon(
-                      icon,
-                      color: OnboardingTheme.orange,
-                      size: scale.s(30),
-                    ),
-                  ),
-                  SizedBox(width: scale.s(14)),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          title,
-                          style: GoogleFonts.ubuntu(
-                            color: OnboardingTheme.orange,
-                            fontSize: titleSize,
-                            fontWeight: FontWeight.w700,
-                            height: 1.15,
-                          ),
+                      SizedBox(height: scale.s(6)),
+                      Text(
+                        subtitle,
+                        style: GoogleFonts.ubuntu(
+                          color: OnboardingTheme.white.withValues(alpha: 0.58),
+                          fontSize: subtitleSize,
+                          height: 1.35,
+                          fontWeight: FontWeight.w400,
                         ),
-                        SizedBox(height: scale.s(6)),
-                        Text(
-                          subtitle,
-                          style: GoogleFonts.ubuntu(
-                            color: OnboardingTheme.white.withValues(alpha: 0.58),
-                            fontSize: subtitleSize,
-                            height: 1.35,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    width: scale.s(26),
-                    height: scale.s(26),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
+                ),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  width: scale.s(26),
+                  height: scale.s(26),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: selected
+                        ? OnboardingTheme.orange
+                        : Colors.white.withValues(alpha: 0.08),
+                    border: Border.all(
                       color: selected
                           ? OnboardingTheme.orange
-                          : Colors.white.withValues(alpha: 0.08),
-                      border: Border.all(
-                        color: selected
-                            ? OnboardingTheme.orange
-                            : Colors.white.withValues(alpha: 0.22),
-                      ),
+                          : Colors.white.withValues(alpha: 0.22),
                     ),
-                    child: selected
-                        ? Icon(
-                            Icons.check_rounded,
-                            color: Colors.white,
-                            size: scale.s(16),
-                          )
-                        : null,
                   ),
-                ],
-              ),
+                  child: selected
+                      ? Icon(
+                          Icons.check_rounded,
+                          color: Colors.white,
+                          size: scale.s(16),
+                        )
+                      : null,
+                ),
+              ],
             ),
           ),
         ),

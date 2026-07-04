@@ -40,16 +40,26 @@ class _SettingsPopupState extends State<SettingsPopup> {
 
   void _apply() {
     UserSession.instance.setLanguage(_language);
-    UserSession.instance.setAccountType(_mode);
-    widget.onChanged();
 
-    final navigateToVerify = _mode == AccountType.business;
     final navigator = Navigator.of(context);
+    final wasBusiness = UserSession.instance.isBusiness;
+
+    if (_mode == AccountType.personal) {
+      UserSession.instance.setAccountType(AccountType.personal);
+      widget.onChanged();
+      navigator.pop();
+      return;
+    }
+
     navigator.pop();
 
-    if (!navigateToVerify) return;
+    if (wasBusiness) {
+      widget.onChanged();
+      return;
+    }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!navigator.mounted) return;
       navigator.push(
         MaterialPageRoute<void>(
           builder: (_) => const EnterPhoneScreen(fromSettings: true),

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
+import '../services/app_permissions.dart';
+import '../services/local_notification_service.dart';
 import '../services/user_session.dart';
 import 'package:tardadi_core/tardadi_core.dart';
 
@@ -57,6 +59,14 @@ class BusArrivalNotificationService {
     required String routeId,
     required int initialMinutes,
   }) async {
+    if (!await AppPermissions.hasNotificationPermission()) {
+      final granted = await LocalNotificationService.instance.requestPermission();
+      if (!granted) {
+        _showInAppFallback(_l10n.notificationsPermissionDenied);
+        return;
+      }
+    }
+
     _enabledBusIds.add(busId);
     _remainingMinutes[busId] = initialMinutes;
     _notifiedThresholds[busId] = {};
@@ -67,7 +77,7 @@ class BusArrivalNotificationService {
       routeId: routeId,
     );
 
-    _showMessage(_l10n.notificationsOn(busName));
+    await _showSystemNotification(_l10n.notificationsOn(busName));
     _checkApproachThresholds(busId: busId, busName: busName);
 
     _timers[busId]?.cancel();
@@ -104,7 +114,7 @@ class BusArrivalNotificationService {
     _notifyListeners();
 
     if (busName != null) {
-      _showMessage(_l10n.notificationsOff(busName));
+      await _showSystemNotification(_l10n.notificationsOff(busName));
     }
   }
 
@@ -141,15 +151,33 @@ class BusArrivalNotificationService {
       if (remaining > threshold || notified.contains(threshold)) continue;
 
       notified.add(threshold);
-      if (threshold == 0) {
-        _showMessage(_l10n.busArrived(busName));
-      } else {
-        _showMessage(_l10n.busMinutesAway(busName, threshold));
-      }
+      final message = threshold == 0
+          ? _l10n.busArrived(busName)
+          : _l10n.busMinutesAway(busName, threshold);
+
+      unawaited(_showSystemNotification(
+        message,
+        notificationId: _notificationId(busId, threshold),
+      ));
     }
   }
 
-  void _showMessage(String message) {
+  int _notificationId(String busId, int threshold) {
+    return Object.hash(busId, threshold);
+  }
+
+  Future<void> _showSystemNotification(
+    String body, {
+    int? notificationId,
+  }) async {
+    await LocalNotificationService.instance.show(
+      title: _l10n.appName,
+      body: body,
+      id: notificationId,
+    );
+  }
+
+  void _showInAppFallback(String message) {
     final messenger = _messengerKey?.currentState;
     if (messenger == null) return;
 

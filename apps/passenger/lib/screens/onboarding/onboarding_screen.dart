@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../services/app_permissions.dart';
 import '../account_type_screen.dart';
 import '../../widgets/onboarding/location_illustration.dart';
 import '../../widgets/onboarding/location_permission_dialog.dart';
@@ -30,9 +30,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _finishOnboarding({required bool requestLocation}) async {
-    if (requestLocation) {
-      await Geolocator.requestPermission();
-    }
+    setState(() => _showPermissionDialog = false);
+
+    await AppPermissions.requestOnboardingPermissions(
+      requestLocation: requestLocation,
+    );
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(builder: (_) => const AccountTypeScreen()),
@@ -66,7 +68,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 children: [
                   SizedBox(height: scale.s(20)),
                   _OnboardingHeader(
-                    pageIndex: _pageIndex,
                     scale: scale,
                     tagline: l10n.onboardingTagline,
                   ),
@@ -141,40 +142,30 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
 class _OnboardingHeader extends StatelessWidget {
   const _OnboardingHeader({
-    required this.pageIndex,
     required this.scale,
     required this.tagline,
   });
 
-  final int pageIndex;
   final OnboardingScale scale;
   final String tagline;
 
   @override
   Widget build(BuildContext context) {
-    if (pageIndex == 0) {
-      return Column(
-        children: [
-          TardadiLogoIcon(size: scale.logoIconSize),
-          SizedBox(height: scale.s(12)),
-          Text(
-            tagline,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: OnboardingTheme.muted,
-              fontSize: scale.onboardingTaglineSize,
-              letterSpacing: 1.2,
-              fontWeight: FontWeight.w600,
-            ),
+    return Column(
+      children: [
+        TardadiLogoIcon(size: scale.logoIconSize),
+        SizedBox(height: scale.s(12)),
+        Text(
+          tagline,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: OnboardingTheme.muted,
+            fontSize: scale.onboardingTaglineSize,
+            letterSpacing: 1.2,
+            fontWeight: FontWeight.w600,
           ),
-        ],
-      );
-    }
-
-    return TardadiLogo(
-      iconSize: scale.compactLogoIconSize,
-      arabicSize: scale.compactArabicSize,
-      englishSize: scale.compactEnglishSize,
+        ),
+      ],
     );
   }
 }

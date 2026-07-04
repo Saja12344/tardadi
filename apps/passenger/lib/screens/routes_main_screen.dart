@@ -82,8 +82,9 @@ class _RoutesMainScreenState extends State<RoutesMainScreen> {
 
   List<RouteListItem> get _filteredRoutes {
     if (_query.isEmpty) return _routes;
+    final l10n = context.l10n;
     return _routes
-        .where((route) => route.name.toLowerCase().contains(_query))
+        .where((route) => l10n.routeNameMatchesQuery(route.name, _query))
         .toList();
   }
 
@@ -159,7 +160,7 @@ class _RoutesMainScreenState extends State<RoutesMainScreen> {
                               _SectionHeader(title: l10n.business, scale: scale),
                               ..._businessRoutes.map(
                                 (route) => RouteCard(
-                                  name: route.name,
+                                  name: l10n.localizeRouteName(route.name),
                                   frequencyLabel:
                                       l10n.localizeMetaLabel(route.frequencyLabel),
                                   busCountLabel:
@@ -176,7 +177,7 @@ class _RoutesMainScreenState extends State<RoutesMainScreen> {
                               _SectionHeader(title: l10n.publicSection, scale: scale),
                               ..._publicRoutes.map(
                                 (route) => RouteCard(
-                                  name: route.name,
+                                  name: l10n.localizeRouteName(route.name),
                                   frequencyLabel:
                                       l10n.localizeMetaLabel(route.frequencyLabel),
                                   busCountLabel:

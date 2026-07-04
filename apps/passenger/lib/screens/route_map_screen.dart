@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../l10n/app_localizations.dart';
 import '../models/route_list_item.dart';
 import '../services/bus_arrival_notifications.dart';
+import '../widgets/left_back_button.dart';
 import '../widgets/onboarding/frosted_glass.dart';
 import '../widgets/onboarding/onboarding_theme.dart';
 import '../widgets/vehicle_icon.dart';
@@ -67,13 +68,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
 
     return Scaffold(
       backgroundColor: OnboardingTheme.background,
-      appBar: AppBar(
+      appBar: LeftBackAppBar(
         backgroundColor: OnboardingTheme.background,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-        ),
+        onBack: () => Navigator.of(context).pop(),
         title: Text(
           l10n.routeStopTitle(widget.route.name, 'A'),
           style: const TextStyle(
@@ -132,13 +129,9 @@ class _FullRouteMapScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: OnboardingTheme.background,
-      appBar: AppBar(
+      appBar: LeftBackAppBar(
         backgroundColor: OnboardingTheme.background,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-        ),
+        onBack: () => Navigator.of(context).pop(),
         title: Text(
           title,
           style: const TextStyle(
@@ -230,48 +223,24 @@ class _BusArrivalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isActive = item.isActive;
-
-    if (isActive) {
-      return Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: OnboardingTheme.orange,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: _buildContent(context, isActive: true),
-      );
-    }
-
     return FrostedGlass(
       margin: const EdgeInsets.only(bottom: 12),
       borderRadius: 16,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: _buildContent(context, isActive: false),
+      child: _buildContent(context),
     );
   }
 
-  Widget _buildContent(BuildContext context, {required bool isActive}) {
+  Widget _buildContent(BuildContext context) {
     final l10n = context.l10n;
 
-    final titleColor = isActive ? Colors.white : OnboardingTheme.glassText;
-    final chipTextColor =
-        isActive ? Colors.white : OnboardingTheme.white.withValues(alpha: 0.92);
-    final chipIconColor =
-        isActive ? Colors.white : OnboardingTheme.white.withValues(alpha: 0.85);
-    final iconBackground = isActive
-        ? Colors.white.withValues(alpha: 0.18)
-        : Colors.white.withValues(alpha: 0.10);
-    final iconBorder = isActive
-        ? Colors.white.withValues(alpha: 0.28)
-        : Colors.white.withValues(alpha: 0.14);
-    final chipBackground = isActive
-        ? Colors.white.withValues(alpha: 0.16)
-        : Colors.white.withValues(alpha: 0.08);
-    final chipBorder = isActive
-        ? Colors.white.withValues(alpha: 0.24)
-        : Colors.white.withValues(alpha: 0.12);
+    const titleColor = OnboardingTheme.glassText;
+    final chipTextColor = OnboardingTheme.white.withValues(alpha: 0.92);
+    final chipIconColor = OnboardingTheme.white.withValues(alpha: 0.85);
+    const iconBackground = Color.fromRGBO(255, 255, 255, 0.10);
+    const iconBorder = Color.fromRGBO(255, 255, 255, 0.14);
+    const chipBackground = Color.fromRGBO(255, 255, 255, 0.08);
+    const chipBorder = Color.fromRGBO(255, 255, 255, 0.12);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -335,7 +304,6 @@ class _BusArrivalCard extends StatelessWidget {
         _NotificationBellButton(
           enabled: notificationsEnabled,
           onTap: onToggleNotifications,
-          isOnActiveCard: isActive,
         ),
       ],
     );
@@ -392,14 +360,10 @@ class _NotificationBellButton extends StatelessWidget {
   const _NotificationBellButton({
     required this.enabled,
     required this.onTap,
-    required this.isOnActiveCard,
   });
 
   final bool enabled;
   final VoidCallback onTap;
-  final bool isOnActiveCard;
-
-  static const _activeBlue = Color(0xFF2F80ED);
 
   @override
   Widget build(BuildContext context) {
@@ -413,22 +377,19 @@ class _NotificationBellButton extends StatelessWidget {
           height: 44,
           decoration: BoxDecoration(
             color: enabled
-                ? _activeBlue
-                : isOnActiveCard
-                    ? Colors.white.withValues(alpha: 0.16)
-                    : OnboardingTheme.background.withValues(alpha: 0.35),
+                ? OnboardingTheme.orange
+                : OnboardingTheme.background.withValues(alpha: 0.35),
             borderRadius: BorderRadius.circular(12),
-            border: enabled
-                ? null
-                : Border.all(
-                    color: isOnActiveCard
-                        ? Colors.white.withValues(alpha: 0.28)
-                        : OnboardingTheme.muted.withValues(alpha: 0.35),
-                  ),
+            border: Border.all(
+              color: enabled
+                  ? OnboardingTheme.orange
+                  : OnboardingTheme.muted.withValues(alpha: 0.35),
+              width: 1.5,
+            ),
           ),
           child: Icon(
             enabled ? Icons.notifications : Icons.notifications_outlined,
-            color: enabled ? Colors.white : (isOnActiveCard ? Colors.white : OnboardingTheme.muted),
+            color: enabled ? Colors.white : OnboardingTheme.muted,
             size: 22,
           ),
         ),
