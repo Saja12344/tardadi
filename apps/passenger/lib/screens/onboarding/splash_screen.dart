@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'onboarding_screen.dart';
 import '../../widgets/onboarding/onboarding_scale.dart';
 import '../../widgets/onboarding/onboarding_theme.dart';
+import '../../widgets/tardadi_brand_video.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -11,130 +12,49 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<Offset> _slide;
-  late final Animation<double> _scale;
-  late final Animation<double> _tilt;
-  late final Animation<double> _opacity;
+class _SplashScreenState extends State<SplashScreen> {
+  var _navigated = false;
+  DateTime? _startedAt;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 3400),
-    );
-
-    _slide = TweenSequence<Offset>([
-      TweenSequenceItem(
-        tween: Tween<Offset>(
-          begin: const Offset(-1.6, 0),
-          end: Offset.zero,
-        ).chain(CurveTween(curve: Curves.easeOutCubic)),
-        weight: 68,
-      ),
-      TweenSequenceItem(
-        tween: Tween<Offset>(
-          begin: Offset.zero,
-          end: const Offset(0.06, -0.02),
-        ).chain(CurveTween(curve: Curves.easeOut)),
-        weight: 10,
-      ),
-      TweenSequenceItem(
-        tween: Tween<Offset>(
-          begin: const Offset(0.06, -0.02),
-          end: Offset.zero,
-        ).chain(CurveTween(curve: Curves.easeOutBack)),
-        weight: 22,
-      ),
-    ]).animate(_controller);
-
-    _scale = TweenSequence<double>([
-      TweenSequenceItem(
-        tween: Tween<double>(begin: 0.7, end: 1.1).chain(
-          CurveTween(curve: Curves.easeOutCubic),
-        ),
-        weight: 68,
-      ),
-      TweenSequenceItem(
-        tween: Tween<double>(begin: 1.1, end: 1.0).chain(
-          CurveTween(curve: Curves.easeOutBack),
-        ),
-        weight: 32,
-      ),
-    ]).animate(_controller);
-
-    _tilt = Tween<double>(begin: -0.12, end: 0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0, 0.75, curve: Curves.easeOutCubic),
-      ),
-    );
-
-    _opacity = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0, 0.15, curve: Curves.easeOut),
-      ),
-    );
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _controller.forward().then((_) {
-        Future<void>.delayed(const Duration(milliseconds: 500), _goToOnboarding);
-      });
-    });
+    _startedAt = DateTime.now();
+    Future<void>.delayed(const Duration(seconds: 5), _finishSplash);
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  void _finishSplash() {
+    if (_navigated || !mounted) return;
+    final elapsed = DateTime.now().difference(_startedAt!);
+    const minDuration = Duration(milliseconds: 2400);
+    final remaining = minDuration - elapsed;
 
-  void _goToOnboarding() {
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const OnboardingScreen()),
+    Future<void>.delayed(
+      remaining.isNegative ? Duration.zero : remaining,
+      () {
+        if (!mounted || _navigated) return;
+        _navigated = true;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute<void>(builder: (_) => const OnboardingScreen()),
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final scale = OnboardingScale(context);
-    final logoSize = scale.s(132);
+    final logoSize = scale.s(160);
 
     return Directionality(
       textDirection: TextDirection.ltr,
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, child) {
-          return Scaffold(
-            backgroundColor: OnboardingTheme.background,
-            body: Center(
-              child: SlideTransition(
-                position: _slide,
-                textDirection: TextDirection.ltr,
-                child: Opacity(
-                  opacity: _opacity.value,
-                  child: Transform.rotate(
-                    angle: _tilt.value,
-                    child: Transform.scale(
-                      scale: _scale.value,
-                      child: child,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-        child: Image.asset(
-          'assets/images/logo_icon.png',
-          width: logoSize,
-          height: logoSize,
+      child: Scaffold(
+        backgroundColor: OnboardingTheme.background,
+        body: Center(
+          child: TardadiSplashVideo(
+            size: logoSize,
+            onFinished: _finishSplash,
+          ),
         ),
       ),
     );

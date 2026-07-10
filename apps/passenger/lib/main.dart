@@ -5,11 +5,14 @@ import 'package:tardadi_core/tardadi_core.dart';
 import 'l10n/app_localizations.dart';
 import 'screens/onboarding/splash_screen.dart';
 import 'services/bus_arrival_notifications.dart';
+import 'services/local_notification_service.dart';
 import 'services/user_session.dart';
 
 final rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await LocalNotificationService.instance.initialize();
   BusArrivalNotificationService.instance
       .attachMessenger(rootScaffoldMessengerKey);
   runApp(const TardadiPassengerApp());

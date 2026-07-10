@@ -94,6 +94,8 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
       UserSession.instance.setPhoneNumber('+966500000000');
     }
 
+    UserSession.instance.setAccountType(AccountType.business);
+
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(builder: (_) => const RoutesMainScreen()),
     );

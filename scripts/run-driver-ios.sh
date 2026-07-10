@@ -34,4 +34,6 @@ echo "Booting iOS simulator: $IOS_DEVICE_NAME ($IOS_DEVICE_ID)"
 xcrun simctl boot "$IOS_DEVICE_ID" 2>/dev/null || true
 open -a Simulator --args -CurrentDeviceUDID "$IOS_DEVICE_ID"
 
+bash "$ROOT/scripts/set-sim-location.sh"
+
 flutter run -d "$IOS_DEVICE_ID"

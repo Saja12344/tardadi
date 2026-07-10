@@ -1,13 +1,18 @@
-import 'dart:math' as math;
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:tardadi_core/tardadi_core.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/route_list_item.dart';
 import '../services/bus_arrival_notifications.dart';
+import '../services/passenger_api.dart';
+import '../widgets/left_back_button.dart';
 import '../widgets/onboarding/frosted_glass.dart';
 import '../widgets/onboarding/onboarding_theme.dart';
+import '../widgets/passenger_route_map.dart';
+import '../widgets/tardadi_brand_video.dart';
 import '../widgets/vehicle_icon.dart';
 
 class RouteMapScreen extends StatefulWidget {
@@ -20,18 +25,24 @@ class RouteMapScreen extends StatefulWidget {
 }
 
 class _RouteMapScreenState extends State<RouteMapScreen> {
+  final _api = createPassengerApi();
   final _notifications = BusArrivalNotificationService.instance;
-  late final List<BusArrivalItem> _buses;
+  RouteLiveSnapshot? _snapshot;
+  List<BusArrivalItem> _buses = [];
+  var _loading = true;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
-    _buses = BusArrivalItem.demoForRoute(widget.route.name);
     _notifications.addListener(_onNotificationsChanged);
+    _loadLive();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) => _loadLive());
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _notifications.removeListener(_onNotificationsChanged);
     super.dispose();
   }
@@ -40,22 +51,62 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _loadLive() async {
+    try {
+      final snapshot = await _api.getRouteLive(widget.route.routeId);
+      if (!mounted) return;
+      final buses = snapshot.buses
+          .map(
+            (bus) => BusArrivalItem.fromBus(
+              bus,
+              minutesAway: _estimateMinutes(bus, snapshot.stops),
+            ),
+          )
+          .toList();
+
+      if (!mounted) return;
+      setState(() {
+        _snapshot = snapshot;
+        _buses = buses;
+        _loading = false;
+      });
+      _notifications.updateFromLive(buses: buses, stops: snapshot.stops);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  int _estimateMinutes(BusModel bus, List<StopModel> stops) {
+    final location = bus.currentLocation;
+    if (location == null || stops.isEmpty) return 99;
+
+    final target = stops.first;
+    return estimateEtaMinutes(
+      location,
+      GeoPoint(latitude: target.latitude, longitude: target.longitude),
+    );
+  }
+
   Future<void> _toggleBell(BusArrivalItem bus) async {
     await _notifications.toggle(
       busId: bus.id,
       busName: bus.name,
       routeId: widget.route.routeId,
-      initialMinutes: bus.minutesAway,
     );
   }
 
   void _openFullMap() {
-    final l10n = context.l10n;
+    final snapshot = _snapshot;
+    if (snapshot == null) return;
 
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => _FullRouteMapScreen(
-          title: l10n.routeStopTitle(widget.route.name, 'A'),
+          title: context.l10n.localizeRouteName(widget.route.name),
+          route: snapshot.route,
+          stops: snapshot.stops,
+          buses: snapshot.buses,
         ),
       ),
     );
@@ -64,23 +115,36 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final snapshot = _snapshot;
+    final routeName = l10n.localizeRouteName(widget.route.name);
+    final liveCount = snapshot?.liveBusCount ?? widget.route.liveBusCount;
 
     return Scaffold(
       backgroundColor: OnboardingTheme.background,
-      appBar: AppBar(
+      appBar: LeftBackAppBar(
         backgroundColor: OnboardingTheme.background,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-        ),
-        title: Text(
-          l10n.routeStopTitle(widget.route.name, 'A'),
-          style: const TextStyle(
-            color: OnboardingTheme.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-          ),
+        onBack: () => Navigator.of(context).pop(),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              routeName,
+              style: const TextStyle(
+                color: OnboardingTheme.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (liveCount > 0)
+              Text(
+                l10n.liveBusesOnRoute(liveCount),
+                style: TextStyle(
+                  color: OnboardingTheme.orange.withValues(alpha: 0.95),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+          ],
         ),
       ),
       body: Column(
@@ -89,7 +153,17 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
             flex: 5,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: _RouteMapPreview(onTap: _openFullMap),
+              child: _loading || snapshot == null
+                  ? const Center(child: TardadiLoading(size: 72))
+                  : _RouteMapPreview(
+                      onTap: _openFullMap,
+                      child: PassengerRouteMap(
+                        route: snapshot.route,
+                        stops: snapshot.stops,
+                        buses: snapshot.buses,
+                        borderRadius: 16,
+                      ),
+                    ),
             ),
           ),
           Expanded(
@@ -103,18 +177,29 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                   topRight: Radius.circular(24),
                 ),
               ),
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
-                itemCount: _buses.length,
-                itemBuilder: (context, index) {
-                  final bus = _buses[index];
-                  return _BusArrivalCard(
-                    item: bus,
-                    notificationsEnabled: _notifications.isEnabled(bus.id),
-                    onToggleNotifications: () => _toggleBell(bus),
-                  );
-                },
-              ),
+              child: _buses.isEmpty
+                  ? Center(
+                      child: Text(
+                        l10n.noLiveBuses,
+                        style: GoogleFonts.ubuntu(
+                          color: OnboardingTheme.muted,
+                          fontSize: 15,
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+                      itemCount: _buses.length,
+                      itemBuilder: (context, index) {
+                        final bus = _buses[index];
+                        return _BusArrivalCard(
+                          item: bus,
+                          notificationsEnabled:
+                              _notifications.isEnabled(bus.id),
+                          onToggleNotifications: () => _toggleBell(bus),
+                        );
+                      },
+                    ),
             ),
           ),
         ],
@@ -124,21 +209,25 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
 }
 
 class _FullRouteMapScreen extends StatelessWidget {
-  const _FullRouteMapScreen({required this.title});
+  const _FullRouteMapScreen({
+    required this.title,
+    required this.route,
+    required this.stops,
+    required this.buses,
+  });
 
   final String title;
+  final RouteModel route;
+  final List<StopModel> stops;
+  final List<BusModel> buses;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: OnboardingTheme.background,
-      appBar: AppBar(
+      appBar: LeftBackAppBar(
         backgroundColor: OnboardingTheme.background,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-        ),
+        onBack: () => Navigator.of(context).pop(),
         title: Text(
           title,
           style: const TextStyle(
@@ -148,18 +237,24 @@ class _FullRouteMapScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: const Padding(
-        padding: EdgeInsets.fromLTRB(16, 8, 16, 24),
-        child: _RouteMapCanvas(borderRadius: 16),
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        child: PassengerRouteMap(
+          route: route,
+          stops: stops,
+          buses: buses,
+          borderRadius: 16,
+        ),
       ),
     );
   }
 }
 
 class _RouteMapPreview extends StatelessWidget {
-  const _RouteMapPreview({required this.onTap});
+  const _RouteMapPreview({required this.onTap, required this.child});
 
   final VoidCallback onTap;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
@@ -175,7 +270,7 @@ class _RouteMapPreview extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              const _RouteMapCanvas(borderRadius: 16),
+              child,
               Positioned(
                 top: 12,
                 right: 12,
@@ -200,23 +295,6 @@ class _RouteMapPreview extends StatelessWidget {
   }
 }
 
-class _RouteMapCanvas extends StatelessWidget {
-  const _RouteMapCanvas({required this.borderRadius});
-
-  final double borderRadius;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(borderRadius),
-      child: CustomPaint(
-        painter: _RouteMapPainter(),
-        child: const SizedBox.expand(),
-      ),
-    );
-  }
-}
-
 class _BusArrivalCard extends StatelessWidget {
   const _BusArrivalCard({
     required this.item,
@@ -230,114 +308,143 @@ class _BusArrivalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isActive = item.isActive;
+    final l10n = context.l10n;
 
-    if (isActive) {
-      return Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: OnboardingTheme.orange,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: _buildContent(context, isActive: true),
-      );
-    }
+    const titleColor = OnboardingTheme.glassText;
+    final chipTextColor = OnboardingTheme.white.withValues(alpha: 0.92);
+    final chipIconColor = OnboardingTheme.white.withValues(alpha: 0.85);
+    const iconBackground = Color.fromRGBO(255, 255, 255, 0.10);
+    const iconBorder = Color.fromRGBO(255, 255, 255, 0.14);
+    const chipBackground = Color.fromRGBO(255, 255, 255, 0.08);
+    const chipBorder = Color.fromRGBO(255, 255, 255, 0.12);
 
     return FrostedGlass(
       margin: const EdgeInsets.only(bottom: 12),
       borderRadius: 16,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: _buildContent(context, isActive: false),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: iconBackground,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: iconBorder),
+            ),
+            alignment: Alignment.center,
+            child: VehicleIcon(
+              vehicleType: item.vehicleType,
+              color: chipIconColor,
+              size: 34,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l10n.vehicleLabel(item.vehicleType, item.name),
+                        style: GoogleFonts.ubuntu(
+                          color: titleColor,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 18,
+                          height: 1.15,
+                        ),
+                      ),
+                    ),
+                    if (item.isLive) const _LiveBadge(),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _ArrivalDetailChip(
+                      icon: Icons.schedule_rounded,
+                      label: l10n.minutesLabel(item.minutesAway),
+                      textColor: chipTextColor,
+                      iconColor: chipIconColor,
+                      backgroundColor: chipBackground,
+                      borderColor: chipBorder,
+                    ),
+                    _ArrivalDetailChip(
+                      icon: Icons.groups_2_rounded,
+                      label: l10n.crowdingLabel(item.crowdingLabel),
+                      textColor: chipTextColor,
+                      iconColor: chipIconColor,
+                      backgroundColor: chipBackground,
+                      borderColor: chipBorder,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          _NotificationBellButton(
+            enabled: notificationsEnabled,
+            onTap: onToggleNotifications,
+          ),
+        ],
+      ),
     );
   }
+}
 
-  Widget _buildContent(BuildContext context, {required bool isActive}) {
+class _LiveBadge extends StatelessWidget {
+  const _LiveBadge();
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
-
-    final titleColor = isActive ? Colors.white : OnboardingTheme.glassText;
-    final chipTextColor =
-        isActive ? Colors.white : OnboardingTheme.white.withValues(alpha: 0.92);
-    final chipIconColor =
-        isActive ? Colors.white : OnboardingTheme.white.withValues(alpha: 0.85);
-    final iconBackground = isActive
-        ? Colors.white.withValues(alpha: 0.18)
-        : Colors.white.withValues(alpha: 0.10);
-    final iconBorder = isActive
-        ? Colors.white.withValues(alpha: 0.28)
-        : Colors.white.withValues(alpha: 0.14);
-    final chipBackground = isActive
-        ? Colors.white.withValues(alpha: 0.16)
-        : Colors.white.withValues(alpha: 0.08);
-    final chipBorder = isActive
-        ? Colors.white.withValues(alpha: 0.24)
-        : Colors.white.withValues(alpha: 0.12);
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: iconBackground,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: iconBorder),
-          ),
-          alignment: Alignment.center,
-          child: VehicleIcon(
-            vehicleType: item.vehicleType,
-            color: chipIconColor,
-            size: 34,
-          ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            OnboardingTheme.orange.withValues(alpha: 0.95),
+            OnboardingTheme.orange.withValues(alpha: 0.72),
+          ],
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                l10n.vehicleLabel(item.vehicleType, item.name),
-                style: GoogleFonts.ubuntu(
-                  color: titleColor,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
-                  height: 1.15,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _ArrivalDetailChip(
-                    icon: Icons.schedule_rounded,
-                    label: l10n.minutesLabel(item.minutesAway),
-                    textColor: chipTextColor,
-                    iconColor: chipIconColor,
-                    backgroundColor: chipBackground,
-                    borderColor: chipBorder,
-                  ),
-                  _ArrivalDetailChip(
-                    icon: Icons.groups_2_rounded,
-                    label: l10n.crowdingLabel(item.crowdingLabel),
-                    textColor: chipTextColor,
-                    iconColor: chipIconColor,
-                    backgroundColor: chipBackground,
-                    borderColor: chipBorder,
-                  ),
-                ],
-              ),
-            ],
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: [
+          BoxShadow(
+            color: OnboardingTheme.orange.withValues(alpha: 0.35),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-        ),
-        const SizedBox(width: 10),
-        _NotificationBellButton(
-          enabled: notificationsEnabled,
-          onTap: onToggleNotifications,
-          isOnActiveCard: isActive,
-        ),
-      ],
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            l10n.liveBadge,
+            style: GoogleFonts.ubuntu(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -392,14 +499,10 @@ class _NotificationBellButton extends StatelessWidget {
   const _NotificationBellButton({
     required this.enabled,
     required this.onTap,
-    required this.isOnActiveCard,
   });
 
   final bool enabled;
   final VoidCallback onTap;
-  final bool isOnActiveCard;
-
-  static const _activeBlue = Color(0xFF2F80ED);
 
   @override
   Widget build(BuildContext context) {
@@ -413,104 +516,23 @@ class _NotificationBellButton extends StatelessWidget {
           height: 44,
           decoration: BoxDecoration(
             color: enabled
-                ? _activeBlue
-                : isOnActiveCard
-                    ? Colors.white.withValues(alpha: 0.16)
-                    : OnboardingTheme.background.withValues(alpha: 0.35),
+                ? OnboardingTheme.orange
+                : OnboardingTheme.background.withValues(alpha: 0.35),
             borderRadius: BorderRadius.circular(12),
-            border: enabled
-                ? null
-                : Border.all(
-                    color: isOnActiveCard
-                        ? Colors.white.withValues(alpha: 0.28)
-                        : OnboardingTheme.muted.withValues(alpha: 0.35),
-                  ),
+            border: Border.all(
+              color: enabled
+                  ? OnboardingTheme.orange
+                  : OnboardingTheme.muted.withValues(alpha: 0.35),
+              width: 1.5,
+            ),
           ),
           child: Icon(
             enabled ? Icons.notifications : Icons.notifications_outlined,
-            color: enabled ? Colors.white : (isOnActiveCard ? Colors.white : OnboardingTheme.muted),
+            color: enabled ? Colors.white : OnboardingTheme.muted,
             size: 22,
           ),
         ),
       ),
     );
   }
-}
-
-class _RouteMapPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()..color = const Color(0xFFE8E4DC),
-    );
-
-    final road = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 14
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(
-      Offset(size.width * 0.2, size.height * 0.2),
-      Offset(size.width * 0.8, size.height * 0.75),
-      road,
-    );
-
-    final stopA = Offset(size.width * 0.28, size.height * 0.32);
-    final stopB = Offset(size.width * 0.72, size.height * 0.62);
-
-    _drawDashedLine(canvas, stopA, stopB, const Color(0xFFE53935));
-
-    _drawStop(canvas, stopA, 'A');
-    _drawStop(canvas, stopB, 'B');
-  }
-
-  void _drawDashedLine(Canvas canvas, Offset start, Offset end, Color color) {
-    const dashLength = 8.0;
-    const gapLength = 6.0;
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 3;
-
-    final delta = end - start;
-    final distance = delta.distance;
-    final direction = delta / distance;
-    var drawn = 0.0;
-    var drawDash = true;
-
-    while (drawn < distance) {
-      final segment = drawDash ? dashLength : gapLength;
-      final next = math.min(drawn + segment, distance);
-      if (drawDash) {
-        canvas.drawLine(
-          start + direction * drawn,
-          start + direction * next,
-          paint,
-        );
-      }
-      drawn = next;
-      drawDash = !drawDash;
-    }
-  }
-
-  void _drawStop(Canvas canvas, Offset center, String label) {
-    canvas.drawCircle(center, 16, Paint()..color = const Color(0xFFE53935));
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w700,
-          fontSize: 14,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    textPainter.paint(
-      canvas,
-      center - Offset(textPainter.width / 2, textPainter.height / 2),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

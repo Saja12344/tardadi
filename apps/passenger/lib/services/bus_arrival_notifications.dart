@@ -1,22 +1,27 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import '../l10n/app_localizations.dart';
-import '../services/user_session.dart';
 import 'package:tardadi_core/tardadi_core.dart';
 
+import '../l10n/app_localizations.dart';
+import '../models/route_list_item.dart';
+import '../services/app_permissions.dart';
+import '../services/local_notification_service.dart';
+import '../services/passenger_api.dart';
+import '../services/user_session.dart';
+
+/// Exactly three passenger notifications per enabled bus:
+/// 1) bell enabled, 2) real ETA ≤ 5 min, 3) driver marked arrived.
 class BusArrivalNotificationService {
   BusArrivalNotificationService._();
 
   static final BusArrivalNotificationService instance =
       BusArrivalNotificationService._();
 
-  static const _approachThresholds = [5, 3, 1, 0];
-
   final _enabledBusIds = <String>{};
-  final _timers = <String, Timer>{};
-  final _remainingMinutes = <String, int>{};
-  final _notifiedThresholds = <String, Set<int>>{};
+  final _enabledAt = <String, DateTime>{};
+  final _notifiedFiveMin = <String>{};
+  final _notifiedArrived = <String>{};
   final _reminderIds = <String, String>{};
   final _listeners = <VoidCallback>{};
 
@@ -37,16 +42,14 @@ class BusArrivalNotificationService {
     required String busId,
     required String busName,
     required String routeId,
-    required int initialMinutes,
   }) async {
     if (_enabledBusIds.contains(busId)) {
-      await disable(busId, busName: busName);
+      await disable(busId);
     } else {
       await enable(
         busId: busId,
         busName: busName,
         routeId: routeId,
-        initialMinutes: initialMinutes,
       );
     }
   }
@@ -55,56 +58,88 @@ class BusArrivalNotificationService {
     required String busId,
     required String busName,
     required String routeId,
-    required int initialMinutes,
   }) async {
+    if (!await AppPermissions.hasNotificationPermission()) {
+      final granted = await LocalNotificationService.instance.requestPermission();
+      if (!granted) {
+        _showInAppFallback(_l10n.notificationsPermissionDenied);
+        return;
+      }
+    }
+
     _enabledBusIds.add(busId);
-    _remainingMinutes[busId] = initialMinutes;
-    _notifiedThresholds[busId] = {};
+    _enabledAt[busId] = DateTime.now();
+    _notifiedFiveMin.remove(busId);
+    _notifiedArrived.remove(busId);
     _notifyListeners();
 
-    await _registerBackendReminder(
-      busId: busId,
-      routeId: routeId,
+    await _registerBackendReminder(busId: busId, routeId: routeId);
+    await _showSystemNotification(
+      _l10n.notificationsOn(busName),
+      notificationId: _notificationId(busId, 1),
     );
-
-    _showMessage(_l10n.notificationsOn(busName));
-    _checkApproachThresholds(busId: busId, busName: busName);
-
-    _timers[busId]?.cancel();
-    _timers[busId] = Timer.periodic(const Duration(seconds: 20), (_) {
-      final remaining = _remainingMinutes[busId];
-      if (remaining == null) return;
-
-      if (remaining > 0) {
-        _remainingMinutes[busId] = remaining - 1;
-      }
-
-      _checkApproachThresholds(busId: busId, busName: busName);
-
-      if (_remainingMinutes[busId] == 0) {
-        disable(busId);
-      }
-    });
   }
 
-  Future<void> disable(String busId, {String? busName}) async {
-    _timers.remove(busId)?.cancel();
+  Future<void> disable(String busId) async {
     _enabledBusIds.remove(busId);
-    _remainingMinutes.remove(busId);
-    _notifiedThresholds.remove(busId);
+    _enabledAt.remove(busId);
+    _notifiedFiveMin.remove(busId);
+    _notifiedArrived.remove(busId);
 
     final reminderId = _reminderIds.remove(busId);
     if (reminderId != null) {
       try {
-        _api ??= TardadiApi(config: AppConfig.dev());
+        _api ??= createPassengerApi();
         await _api!.cancelReminder(reminderId);
       } catch (_) {}
     }
 
     _notifyListeners();
+  }
 
-    if (busName != null) {
-      _showMessage(_l10n.notificationsOff(busName));
+  void updateFromLive({
+    required List<BusArrivalItem> buses,
+    required List<StopModel> stops,
+  }) {
+    if (_enabledBusIds.isEmpty || stops.isEmpty) return;
+
+    final target = stops.first;
+    final targetPoint = GeoPoint(
+      latitude: target.latitude,
+      longitude: target.longitude,
+    );
+
+    for (final bus in buses) {
+      if (!_enabledBusIds.contains(bus.id)) continue;
+
+      final enabledAt = _enabledAt[bus.id];
+      if (enabledAt == null) continue;
+
+      if (bus.lastArrivedAt != null && !_notifiedArrived.contains(bus.id)) {
+        final arrival = DateTime.tryParse(bus.lastArrivedAt!);
+        if (arrival != null && arrival.isAfter(enabledAt)) {
+          _notifiedArrived.add(bus.id);
+          unawaited(_showSystemNotification(
+            _l10n.busArrived(bus.name),
+            notificationId: _notificationId(bus.id, 3),
+          ));
+          continue;
+        }
+      }
+
+      if (_notifiedFiveMin.contains(bus.id)) continue;
+
+      final location = bus.currentLocation;
+      if (location == null) continue;
+
+      final eta = estimateEtaMinutes(location, targetPoint);
+      if (eta <= 5) {
+        _notifiedFiveMin.add(bus.id);
+        unawaited(_showSystemNotification(
+          _l10n.busMinutesAway(bus.name, eta),
+          notificationId: _notificationId(bus.id, 2),
+        ));
+      }
     }
   }
 
@@ -113,43 +148,36 @@ class BusArrivalNotificationService {
     required String routeId,
   }) async {
     try {
-      _api ??= TardadiApi(config: AppConfig.dev());
+      _api ??= createPassengerApi();
       final routeData = await _api!.getRoute(routeId);
       if (routeData.stops.isEmpty) return;
 
+      final userId = UserSession.instance.phoneNumber ?? 'passenger-local';
       final reminderId = await _api!.createReminder(
-        userId: 'passenger-demo',
+        userId: userId,
         busId: busId,
         routeId: routeId,
         stopId: routeData.stops.first.stopId,
-        fcmToken: 'fcm-token-demo',
+        fcmToken: 'local-notifications',
       );
       _reminderIds[busId] = reminderId;
     } catch (_) {}
   }
 
-  void _checkApproachThresholds({
-    required String busId,
-    required String busName,
-  }) {
-    final remaining = _remainingMinutes[busId];
-    if (remaining == null) return;
+  int _notificationId(String busId, int kind) => Object.hash(busId, kind);
 
-    final notified = _notifiedThresholds.putIfAbsent(busId, () => {});
-
-    for (final threshold in _approachThresholds) {
-      if (remaining > threshold || notified.contains(threshold)) continue;
-
-      notified.add(threshold);
-      if (threshold == 0) {
-        _showMessage(_l10n.busArrived(busName));
-      } else {
-        _showMessage(_l10n.busMinutesAway(busName, threshold));
-      }
-    }
+  Future<void> _showSystemNotification(
+    String body, {
+    int? notificationId,
+  }) async {
+    await LocalNotificationService.instance.show(
+      title: _l10n.appName,
+      body: body,
+      id: notificationId,
+    );
   }
 
-  void _showMessage(String message) {
+  void _showInAppFallback(String message) {
     final messenger = _messengerKey?.currentState;
     if (messenger == null) return;
 

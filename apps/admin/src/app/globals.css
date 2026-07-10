@@ -810,6 +810,43 @@ tbody tr:hover {
   color: var(--white);
 }
 
+.pick-btn.active.stop {
+  border-color: rgba(96, 165, 250, 0.5);
+  background: rgba(96, 165, 250, 0.1);
+  color: var(--white);
+}
+
+.routes-section-title {
+  margin: 12px 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--grey);
+}
+
+.stop-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stop-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12px;
+}
+
+.accent-dot-stop {
+  background: #60a5fa;
+}
+
 .location-search-field {
   margin-bottom: 4px;
 }

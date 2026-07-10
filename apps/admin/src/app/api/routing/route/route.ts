@@ -34,6 +34,14 @@ export async function POST(request: NextRequest) {
   const payload = body as Record<string, unknown>;
   const from = parsePlace(payload.from, "from");
   const to = parsePlace(payload.to, "to");
+  const waypointsRaw = payload.waypoints;
+  const waypoints: LocationPlace[] = [];
+  if (Array.isArray(waypointsRaw)) {
+    for (const item of waypointsRaw) {
+      const place = parsePlace(item, "waypoint");
+      if (place) waypoints.push(place);
+    }
+  }
 
   if (!from || !to) {
     return NextResponse.json(
@@ -43,7 +51,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const route = await fetchRoadRoute(from, to);
+    const route = await fetchRoadRoute(from, to, waypoints);
     return NextResponse.json({
       coordinates: route.coordinates,
       distanceMeters: route.distanceMeters,

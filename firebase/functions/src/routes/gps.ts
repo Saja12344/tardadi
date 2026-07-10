@@ -9,7 +9,7 @@ const router = Router();
 router.post("/", async (req, res) => {
   try {
     const orgId = getOrgId(req);
-    const { tripId, driverId, busId, latitude, longitude, speedKmh, heading } =
+    const { tripId, driverId, busId, latitude, longitude, speedKmh, heading, crowdLevel } =
       req.body;
 
     if (
@@ -60,10 +60,7 @@ router.post("/", async (req, res) => {
     });
 
     const currentPoint: GeoPoint = { latitude, longitude };
-    if (!isWithinGeofence(currentPoint, stopPoints)) {
-      fail(res, "Location outside allowed route geofence", 403);
-      return;
-    }
+    const withinGeofence = isWithinGeofence(currentPoint, stopPoints);
 
     const now = new Date().toISOString();
     const gpsRef = await tripRef.collection(COLLECTIONS.gpsLogs).add({
@@ -83,9 +80,13 @@ router.post("/", async (req, res) => {
         currentLocation: { latitude, longitude },
         lastSeenAt: now,
         updatedAt: now,
+        ...(crowdLevel ? { crowdLevel } : {}),
       });
 
-    await tripRef.update({ updatedAt: now });
+    await tripRef.update({
+      updatedAt: now,
+      ...(crowdLevel ? { crowdLevel } : {}),
+    });
 
     ok(res, {
       gpsLogId: gpsRef.id,
@@ -93,6 +94,7 @@ router.post("/", async (req, res) => {
       latitude,
       longitude,
       capturedAt: now,
+      withinGeofence,
     }, 201);
   } catch (error) {
     fail(res, (error as Error).message, 500);

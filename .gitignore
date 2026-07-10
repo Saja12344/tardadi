@@ -18,3 +18,5 @@ pubspec.lock
 serviceAccountKey.json
 google-services.json
 GoogleService-Info.plist
+.vercel
+.env*

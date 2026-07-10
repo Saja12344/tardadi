@@ -11,6 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^1.4.0
+  latlong2: ^0.9.1
 
 dev_dependencies:
   lints: ^6.0.0

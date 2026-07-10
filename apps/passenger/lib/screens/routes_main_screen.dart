@@ -2,14 +2,15 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:tardadi_core/tardadi_core.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/route_list_item.dart';
+import '../services/passenger_api.dart';
 import '../services/user_session.dart';
 import '../widgets/onboarding/onboarding_scale.dart';
 import '../widgets/onboarding/onboarding_theme.dart';
 import '../widgets/route_card.dart';
+import '../widgets/tardadi_brand_video.dart';
 import '../widgets/settings_popup.dart';
 import 'route_map_screen.dart';
 
@@ -20,16 +21,19 @@ class RoutesMainScreen extends StatefulWidget {
   State<RoutesMainScreen> createState() => _RoutesMainScreenState();
 }
 
-class _RoutesMainScreenState extends State<RoutesMainScreen> {
-  final _api = TardadiApi(config: AppConfig.dev());
+class _RoutesMainScreenState extends State<RoutesMainScreen>
+    with WidgetsBindingObserver {
+  final _api = createPassengerApi();
   final _searchController = TextEditingController();
-  List<RouteListItem> _routes = RouteListItem.demoRoutes();
+  List<RouteListItem> _routes = [];
   var _loading = true;
+  String? _loadError;
   String _query = '';
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadRoutes();
     _searchController.addListener(() {
       setState(() => _query = _searchController.text.trim().toLowerCase());
@@ -38,52 +42,50 @@ class _RoutesMainScreenState extends State<RoutesMainScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadRoutes() async {
-    final demoRoutes = RouteListItem.demoRoutes();
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadRoutes();
+    }
+  }
 
+  Future<void> _loadRoutes({bool silent = false}) async {
     try {
+      if (!silent && mounted) setState(() => _loading = true);
       final apiRoutes = await _api.getRoutes();
       if (!mounted) return;
-      if (apiRoutes.isNotEmpty) {
-        final apiByName = {
-          for (final route in apiRoutes) route.name.toLowerCase(): route,
-        };
 
-        setState(() {
-          _routes = demoRoutes.map((demo) {
-            final api = apiByName[demo.name.toLowerCase()];
-            if (api == null) return demo;
+      final activeRoutes = apiRoutes
+          .where((route) => route.status == 'active')
+          .map((route) => RouteListItem.fromRoute(route))
+          .toList()
+        ..sort((a, b) => a.name.compareTo(b.name));
 
-            return RouteListItem(
-              routeId: api.routeId,
-              name: api.name,
-              frequencyLabel: demo.frequencyLabel,
-              busCountLabel: demo.busCountLabel,
-              stationsCountLabel: demo.stationsCountLabel,
-              isBusiness: demo.isBusiness,
-            );
-          }).toList();
-          _loading = false;
-        });
-        return;
-      }
-    } catch (_) {}
-
-    if (!mounted) return;
-    setState(() {
-      _routes = demoRoutes;
-      _loading = false;
-    });
+      setState(() {
+        _routes = activeRoutes;
+        _loadError = null;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _routes = [];
+        _loadError = error.toString();
+        _loading = false;
+      });
+    }
   }
 
   List<RouteListItem> get _filteredRoutes {
     if (_query.isEmpty) return _routes;
+    final l10n = context.l10n;
     return _routes
-        .where((route) => route.name.toLowerCase().contains(_query))
+        .where((route) => l10n.routeNameMatchesQuery(route.name, _query))
         .toList();
   }
 
@@ -129,94 +131,114 @@ class _RoutesMainScreenState extends State<RoutesMainScreen> {
                     scale.horizontalPadding,
                     scale.s(8),
                     scale.horizontalPadding,
-                    0,
+                    scale.s(12),
                   ),
                   child: _SearchBar(
                     scale: scale,
                     controller: _searchController,
                   ),
                 ),
-                SizedBox(height: scale.s(22)),
                 Expanded(
                   child: _loading
-                      ? const Center(
-                          child: CircularProgressIndicator(
-                            color: OnboardingTheme.orange,
-                          ),
-                        )
-                      : ListView(
-                          physics: const BouncingScrollPhysics(
-                            parent: AlwaysScrollableScrollPhysics(),
-                          ),
-                          padding: EdgeInsets.fromLTRB(
-                            scale.horizontalPadding,
-                            0,
-                            scale.horizontalPadding,
-                            scale.s(28),
-                          ),
-                          children: [
-                            if (showBusiness && _businessRoutes.isNotEmpty) ...[
-                              _SectionHeader(title: l10n.business, scale: scale),
-                              ..._businessRoutes.map(
-                                (route) => RouteCard(
-                                  name: route.name,
-                                  frequencyLabel:
-                                      l10n.localizeMetaLabel(route.frequencyLabel),
-                                  busCountLabel:
-                                      l10n.localizeMetaLabel(route.busCountLabel),
-                                  stationsCountLabel: l10n.localizeMetaLabel(
-                                    route.stationsCountLabel,
+                      ? const Center(child: TardadiLoading(size: 80))
+                      : _loadError != null
+                          ? _ErrorState(
+                              message: l10n.noRoutesFound,
+                              onRetry: _loadRoutes,
+                            )
+                          : RefreshIndicator(
+                              color: OnboardingTheme.orange,
+                              onRefresh: () => _loadRoutes(silent: true),
+                              child: ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: EdgeInsets.fromLTRB(
+                                scale.s(20),
+                                scale.s(8),
+                                scale.s(20),
+                                scale.s(28),
+                              ),
+                              children: [
+                                if (showBusiness &&
+                                    _businessRoutes.isNotEmpty) ...[
+                                  _SectionHeader(
+                                    title: l10n.business,
+                                    scale: scale,
                                   ),
-                                  onTap: () => _openRoute(route),
-                                ),
-                              ),
-                              SizedBox(height: scale.s(8)),
-                            ],
-                            if (_publicRoutes.isNotEmpty) ...[
-                              _SectionHeader(title: l10n.publicSection, scale: scale),
-                              ..._publicRoutes.map(
-                                (route) => RouteCard(
-                                  name: route.name,
-                                  frequencyLabel:
-                                      l10n.localizeMetaLabel(route.frequencyLabel),
-                                  busCountLabel:
-                                      l10n.localizeMetaLabel(route.busCountLabel),
-                                  stationsCountLabel: l10n.localizeMetaLabel(
-                                    route.stationsCountLabel,
+                                  ..._businessRoutes.map(
+                                    (route) => _buildRouteCard(route, l10n),
                                   ),
-                                  onTap: () => _openRoute(route),
-                                ),
-                              ),
-                            ],
-                            if (_filteredRoutes.isEmpty)
-                              Padding(
-                                padding: EdgeInsets.only(top: scale.s(56)),
-                                child: Column(
-                                  children: [
-                                    Icon(
-                                      Icons.search_off_rounded,
-                                      size: scale.s(48),
-                                      color: OnboardingTheme.muted
-                                          .withValues(alpha: 0.7),
+                                  SizedBox(height: scale.s(8)),
+                                ],
+                                if (_publicRoutes.isNotEmpty) ...[
+                                  _SectionHeader(
+                                    title: l10n.publicSection,
+                                    scale: scale,
+                                  ),
+                                  ..._publicRoutes.map(
+                                    (route) => _buildRouteCard(route, l10n),
+                                  ),
+                                ],
+                                if (_filteredRoutes.isEmpty)
+                                  Padding(
+                                    padding: EdgeInsets.only(top: scale.s(56)),
+                                    child: Column(
+                                      children: [
+                                        Icon(
+                                          Icons.search_off_rounded,
+                                          size: scale.s(48),
+                                          color: OnboardingTheme.muted
+                                              .withValues(alpha: 0.7),
+                                        ),
+                                        SizedBox(height: scale.s(12)),
+                                        Text(
+                                          l10n.noRoutesFound,
+                                          style: GoogleFonts.ubuntu(
+                                            color: OnboardingTheme.muted,
+                                            fontSize: scale.s(15),
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    SizedBox(height: scale.s(12)),
-                                    Text(
-                                      l10n.noRoutesFound,
-                                      style: GoogleFonts.ubuntu(
-                                        color: OnboardingTheme.muted,
-                                        fontSize: scale.s(15),
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
+                                  ),
+                              ],
+                            ),
+                            ),
                 ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRouteCard(RouteListItem route, AppLocalizations l10n) {
+    return RouteCard(
+      name: l10n.localizeRouteName(route.name),
+      frequencyLabel: l10n.localizeMetaLabel(route.frequencyLabel),
+      busCountLabel: l10n.localizeMetaLabel(route.busCountLabel),
+      stationsCountLabel: l10n.localizeMetaLabel(route.stationsCountLabel),
+      onTap: () => _openRoute(route),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(message, style: const TextStyle(color: OnboardingTheme.muted)),
+          const SizedBox(height: 12),
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
         ],
       ),
     );
@@ -250,7 +272,7 @@ class _RoutesHeader extends StatelessWidget {
           children: [
             Align(
               alignment: AlignmentDirectional.centerStart,
-              child: WhiteLogoIcon(size: scale.s(34)),
+              child: TardadiBrandVideo(size: scale.s(38)),
             ),
             Text(
               title,

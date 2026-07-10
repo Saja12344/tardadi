@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "demo-org"
+    "default": "tardadi-5bd8e",
+    "demo": "demo-org"
   }
 }

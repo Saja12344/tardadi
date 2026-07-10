@@ -101,6 +101,7 @@ class TardadiApi {
           stops: (map['stops'] as List)
               .map((e) => StopModel.fromJson(e as Map<String, dynamic>))
               .toList(),
+          tripId: map['tripId'] as String?,
         );
       },
     );
@@ -150,6 +151,24 @@ class TardadiApi {
     );
   }
 
+  Future<void> markTripArrived({
+    required String tripId,
+    required String driverId,
+    String? stopId,
+  }) {
+    return _request(
+      '/api/trips/arrived',
+      method: 'POST',
+      body: {
+        'organizationId': _config.organizationId,
+        'tripId': tripId,
+        'driverId': driverId,
+        if (stopId != null) 'stopId': stopId,
+      },
+      parser: (_) {},
+    );
+  }
+
   Future<void> sendGps({
     required String tripId,
     required String driverId,
@@ -158,6 +177,7 @@ class TardadiApi {
     required double longitude,
     double? speedKmh,
     double? heading,
+    String? crowdLevel,
   }) {
     return _request(
       '/api/gps',
@@ -171,8 +191,17 @@ class TardadiApi {
         'longitude': longitude,
         if (speedKmh != null) 'speedKmh': speedKmh,
         if (heading != null) 'heading': heading,
+        if (crowdLevel != null) 'crowdLevel': crowdLevel,
       },
       parser: (_) {},
+    );
+  }
+
+  Future<RouteLiveSnapshot> getRouteLive(String routeId) {
+    return _request(
+      '/api/routes/$routeId/live',
+      parser: (data) =>
+          RouteLiveSnapshot.fromJson(data as Map<String, dynamic>),
     );
   }
 

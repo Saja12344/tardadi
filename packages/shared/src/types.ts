@@ -47,6 +47,9 @@ export interface Bus {
   currentTripId?: string | null;
   currentLocation?: GeoPoint | null;
   lastSeenAt?: string | null;
+  lastArrivedAt?: string | null;
+  lastArrivedStopId?: string | null;
+  crowdLevel?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -58,6 +61,7 @@ export interface Route {
   code: string;
   colorHex: string;
   status: EntityStatus;
+  accessMode?: AccessMode;
   fromLocation?: LocationPlace | null;
   toLocation?: LocationPlace | null;
   polyline?: string;

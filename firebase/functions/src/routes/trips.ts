@@ -97,6 +97,61 @@ router.post("/start", async (req, res) => {
   }
 });
 
+router.post("/arrived", async (req, res) => {
+  try {
+    const orgId = getOrgId(req);
+    const { tripId, driverId, stopId } = req.body;
+
+    if (!tripId || !driverId) {
+      fail(res, "tripId and driverId are required");
+      return;
+    }
+
+    const tripRef = db
+      .collection(COLLECTIONS.organizations)
+      .doc(orgId)
+      .collection(COLLECTIONS.trips)
+      .doc(tripId);
+
+    const tripDoc = await tripRef.get();
+    if (!tripDoc.exists) {
+      fail(res, "Trip not found", 404);
+      return;
+    }
+
+    const trip = tripDoc.data()!;
+    if (trip.tripStatus !== "active") {
+      fail(res, "Trip is not active", 400);
+      return;
+    }
+
+    if (trip.driverId !== driverId) {
+      fail(res, "Trip does not belong to this driver", 403);
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const arrival = {
+      lastArrivedAt: now,
+      lastArrivedStopId: stopId ?? null,
+      updatedAt: now,
+    };
+
+    await tripRef.update(arrival);
+
+    await db
+      .collection(COLLECTIONS.organizations)
+      .doc(orgId)
+      .collection(COLLECTIONS.buses)
+      .doc(trip.busId as string)
+      .update(arrival);
+
+    ok(res, { tripId, arrivedAt: now, stopId: stopId ?? null });
+  } catch (error) {
+    fail(res, (error as Error).message, 500);
+  }
+});
+
 router.post("/end", async (req, res) => {
   try {
     const orgId = getOrgId(req);

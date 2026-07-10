@@ -53,10 +53,11 @@ class AppLocalizations {
       isArabic ? 'شوف المحطات حولك' : 'See stops around you';
 
   String get onboardingSubtitle2 => isArabic
-      ? 'فعّل الموقع مرة واحدة وترددي يحدد المحطات القريبة فوراً.'
-      : 'Allow location access once and Tardadi finds nearby stops instantly.';
+      ? 'فعّل الموقع والإشعارات مرة واحدة لتصلك تنبيهات الباص وتظهر المحطات القريبة.'
+      : 'Allow location and notifications once to get bus alerts and nearby stops.';
 
-  String get allowLocation => isArabic ? 'السماح بالموقع' : 'Allow location';
+  String get allowLocation =>
+      isArabic ? 'متابعة' : 'Continue';
 
   String get locationPermissionTitle => isArabic
       ? 'السماح لـ "ترددي" باستخدام\nموقعك؟'
@@ -132,13 +133,43 @@ class AppLocalizations {
 
   String get publicSection => isArabic ? 'عام' : 'Public';
 
+  String get liveBadge => isArabic ? 'مباشر' : 'Live';
+
+  String get noLiveBuses => isArabic
+      ? 'لا يوجد باص محدّث على هذا الخط حالياً'
+      : 'No live buses on this route right now';
+
+  String liveBusesOnRoute(int count) => isArabic
+      ? '$count باص محدّث'
+      : '$count live bus${count == 1 ? '' : 'es'}';
+
   String minutesLabel(int minutes) => isArabic
       ? '${minutes.toString().padLeft(2, '0')} د'
       : '${minutes.toString().padLeft(2, '0')} min';
 
-  String routeStopTitle(String routeName, String stopLabel) => isArabic
-      ? '$routeName - $stopLabel'
-      : '$routeName - $stopLabel';
+  String routeStopTitle(String routeName, String stopLabel) {
+    final name = localizeRouteName(routeName);
+    return '$name - $stopLabel';
+  }
+
+  String localizeRouteName(String name) {
+    if (!isArabic) return name;
+
+    return switch (name.toLowerCase()) {
+      'diriyah' => 'الدرعية',
+      'roshan' => 'روشن',
+      'avindar' => 'أفندار',
+      'tkaful alrajhin' => 'تكافل الراجحي',
+      _ => name,
+    };
+  }
+
+  bool routeNameMatchesQuery(String routeName, String query) {
+    if (query.isEmpty) return true;
+    final normalized = query.toLowerCase();
+    return routeName.toLowerCase().contains(normalized) ||
+        localizeRouteName(routeName).toLowerCase().contains(normalized);
+  }
 
   String vehicleLabel(VehicleType type, String fallbackName) {
     return switch (type) {
@@ -162,6 +193,17 @@ class AppLocalizations {
   }
 
   String localizeMetaLabel(String value) {
+    if (value == 'Live' || value == 'Scheduled') {
+      return isArabic
+          ? (value == 'Live' ? 'مباشر' : 'مجدول')
+          : value;
+    }
+    final liveMatch = RegExp(r'^(\d+) live / (\d+)$').firstMatch(value);
+    if (liveMatch != null) {
+      final live = liveMatch.group(1)!;
+      final total = liveMatch.group(2)!;
+      return isArabic ? '$live محدّث من $total' : value;
+    }
     if (value.contains('Every') && value.contains('min')) {
       final match = RegExp(r'(\d+)').firstMatch(value);
       final minutes = match?.group(1) ?? '5';
@@ -193,6 +235,10 @@ class AppLocalizations {
   String busMinutesAway(String busName, int minutes) => isArabic
       ? '$busName على بعد $minutes د'
       : '$busName is $minutes min away';
+
+  String get notificationsPermissionDenied => isArabic
+      ? 'فعّل الإشعارات من إعدادات الجهاز لتلقي تنبيهات الباص'
+      : 'Enable notifications in device settings to get bus alerts';
 }
 
 class AppLocaleScope extends InheritedWidget {

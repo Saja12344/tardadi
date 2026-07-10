@@ -13,7 +13,8 @@ type RoadRouteState = {
 
 export function useRoadRoute(
   from: LocationPlace | null,
-  to: LocationPlace | null
+  to: LocationPlace | null,
+  waypoints: LocationPlace[] = []
 ) {
   const [roadRoute, setRoadRoute] = useState<RoadRouteState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -30,10 +31,14 @@ export function useRoadRoute(
     setLoading(true);
     setError("");
 
+    const waypointKey = waypoints
+      .map((point) => `${point.latitude},${point.longitude}`)
+      .join("|");
+
     fetch("/api/routing/route", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ from, to }),
+      body: JSON.stringify({ from, to, waypoints }),
       signal: controller.signal,
     })
       .then(async (response) => {
@@ -49,7 +54,7 @@ export function useRoadRoute(
       .finally(() => setLoading(false));
 
     return () => controller.abort();
-  }, [from, to]);
+  }, [from, to, waypoints]);
 
   return { roadRoute, loading, error };
 }

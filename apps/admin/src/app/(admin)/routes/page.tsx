@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { LocationPlace, Route, Stop } from "@tardadi/shared";
+import { totalStationCount } from "@tardadi/shared";
 import { api } from "@/lib/api";
 import { adminFetch } from "@/lib/adminFetch";
 import LocationSearchField from "@/components/LocationSearchField";
@@ -13,6 +14,7 @@ import {
 } from "@/hooks/useRoadRoute";
 import { decodePolyline } from "@/lib/routing";
 import { routeEndpointsToMarkers, stopsToMarkers } from "@/lib/mapUtils";
+import { sortPlacesAlongRoute } from "@/lib/routeOrdering";
 import { getUserErrorMessage } from "@/lib/errorMessage";
 
 type PanelMode = "list" | "create" | "detail";
@@ -48,11 +50,18 @@ export default function RoutesPage() {
   const [code, setCode] = useState("");
   const [fromLocation, setFromLocation] = useState<LocationPlace | null>(null);
   const [toLocation, setToLocation] = useState<LocationPlace | null>(null);
+  const [intermediateStops, setIntermediateStops] = useState<LocationPlace[]>([]);
+  const [accessMode, setAccessMode] = useState<"public" | "private">("public");
   const [pickMode, setPickMode] = useState<PickMode>("from");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const createRoute = useRoadRoute(fromLocation, toLocation);
+  const orderedStops = useMemo(() => {
+    if (!fromLocation || !toLocation) return intermediateStops;
+    return sortPlacesAlongRoute(fromLocation, toLocation, intermediateStops);
+  }, [fromLocation, toLocation, intermediateStops]);
+
+  const createRoute = useRoadRoute(fromLocation, toLocation, orderedStops);
   const detailNeedsFetch =
     selectedRoute?.fromLocation &&
     selectedRoute?.toLocation &&
@@ -94,6 +103,8 @@ export default function RoutesPage() {
     setCode("");
     setFromLocation(null);
     setToLocation(null);
+    setIntermediateStops([]);
+    setAccessMode("public");
     setPickMode("from");
     setError("");
     setSuccess("");
@@ -130,9 +141,16 @@ export default function RoutesPage() {
           name,
           code,
           colorHex: "#EB4F26",
+          accessMode,
           fromLocation,
           toLocation,
           polyline: createRoute.roadRoute.polyline,
+          stops: orderedStops.map((stop, index) => ({
+            name: stop.address.split(",")[0] || `محطة ${index + 1}`,
+            latitude: stop.latitude,
+            longitude: stop.longitude,
+            sequenceNo: index + 1,
+          })),
         }),
       });
       resetCreateForm();
@@ -149,9 +167,16 @@ export default function RoutesPage() {
       if (!pickMode) return;
       const place = await reverseGeocode(lat, lng);
       if (pickMode === "from") setFromLocation(place);
-      else setToLocation(place);
+      else if (pickMode === "to") setToLocation(place);
+      else if (pickMode === "stop") {
+        setIntermediateStops((prev) => {
+          const next = [...prev, place];
+          if (!fromLocation || !toLocation) return next;
+          return sortPlacesAlongRoute(fromLocation, toLocation, next);
+        });
+      }
     },
-    [pickMode]
+    [pickMode, fromLocation, toLocation]
   );
 
   const handleMarkerDrag = useCallback(
@@ -166,6 +191,13 @@ export default function RoutesPage() {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    if (!fromLocation || !toLocation) return;
+    setIntermediateStops((prev) =>
+      sortPlacesAlongRoute(fromLocation, toLocation, prev)
+    );
+  }, [fromLocation, toLocation]);
 
   const mapFrom = panelMode === "create" ? fromLocation : selectedRoute?.fromLocation ?? null;
   const mapTo = panelMode === "create" ? toLocation : selectedRoute?.toLocation ?? null;
@@ -191,6 +223,31 @@ export default function RoutesPage() {
   }, [panelMode, selectedRoute, stops]);
 
   const routeMeta = panelMode === "create" ? createRoute : detailRoute;
+
+  const createStationTotal = totalStationCount(orderedStops.length, {
+    hasFrom: !!fromLocation,
+    hasTo: !!toLocation,
+  });
+
+  const publicRoutes = useMemo(
+    () => routes.filter((route) => route.accessMode !== "private"),
+    [routes]
+  );
+  const businessRoutes = useMemo(
+    () => routes.filter((route) => route.accessMode === "private"),
+    [routes]
+  );
+
+  const createStopMarkers = useMemo(
+    () =>
+      orderedStops.map((stop, index) => ({
+        id: `draft-stop-${index}`,
+        kind: "stop" as const,
+        position: [stop.latitude, stop.longitude] as [number, number],
+        label: `${index + 1}. ${stop.address.split(",")[0]}`,
+      })),
+    [orderedStops]
+  );
 
   return (
     <div className="routes-workspace">
@@ -232,23 +289,52 @@ export default function RoutesPage() {
             {routes.length === 0 ? (
               <p className="map-hint">لا توجد خطوط — اضغط «خط جديد»</p>
             ) : (
-              routes.map((route) => (
-                <button
-                  key={route.routeId}
-                  type="button"
-                  className={`route-list-item ${selectedRouteId === route.routeId ? "active" : ""}`}
-                  onClick={() => loadRouteDetail(route.routeId)}
-                >
-                  <strong>{route.name}</strong>
-                  <span className="route-list-code">{route.code}</span>
-                  {route.fromLocation && route.toLocation && (
-                    <span className="route-list-path">
-                      {route.fromLocation.address.split(",")[0]} →{" "}
-                      {route.toLocation.address.split(",")[0]}
-                    </span>
-                  )}
-                </button>
-              ))
+              <>
+                {businessRoutes.length > 0 && (
+                  <>
+                    <h2 className="routes-section-title">خطوط الأعمال</h2>
+                    {businessRoutes.map((route) => (
+                      <button
+                        key={route.routeId}
+                        type="button"
+                        className={`route-list-item ${selectedRouteId === route.routeId ? "active" : ""}`}
+                        onClick={() => loadRouteDetail(route.routeId)}
+                      >
+                        <strong>{route.name}</strong>
+                        <span className="route-list-code">{route.code}</span>
+                        {route.fromLocation && route.toLocation && (
+                          <span className="route-list-path">
+                            {route.fromLocation.address.split(",")[0]} →{" "}
+                            {route.toLocation.address.split(",")[0]}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </>
+                )}
+                <h2 className="routes-section-title">الخطوط العامة</h2>
+                {publicRoutes.length === 0 ? (
+                  <p className="map-hint">لا توجد خطوط عامة بعد</p>
+                ) : (
+                  publicRoutes.map((route) => (
+                    <button
+                      key={route.routeId}
+                      type="button"
+                      className={`route-list-item ${selectedRouteId === route.routeId ? "active" : ""}`}
+                      onClick={() => loadRouteDetail(route.routeId)}
+                    >
+                      <strong>{route.name}</strong>
+                      <span className="route-list-code">{route.code}</span>
+                      {route.fromLocation && route.toLocation && (
+                        <span className="route-list-path">
+                          {route.fromLocation.address.split(",")[0]} →{" "}
+                          {route.toLocation.address.split(",")[0]}
+                        </span>
+                      )}
+                    </button>
+                  ))
+                )}
+              </>
             )}
           </div>
         )}
@@ -272,6 +358,34 @@ export default function RoutesPage() {
                 <span className="accent-dot accent-dot-to" />
                 حدّد النهاية
               </button>
+              <button
+                type="button"
+                className={`pick-btn ${pickMode === "stop" ? "active stop" : ""}`}
+                onClick={() => setPickMode("stop")}
+              >
+                <span className="accent-dot accent-dot-stop" />
+                أضف محطة
+              </button>
+            </div>
+
+            <div className="field">
+              <label>نوع الخط</label>
+              <div className="pick-mode-toggle">
+                <button
+                  type="button"
+                  className={`pick-btn ${accessMode === "public" ? "active from" : ""}`}
+                  onClick={() => setAccessMode("public")}
+                >
+                  عام
+                </button>
+                <button
+                  type="button"
+                  className={`pick-btn ${accessMode === "private" ? "active to" : ""}`}
+                  onClick={() => setAccessMode("private")}
+                >
+                  أعمال
+                </button>
+              </div>
             </div>
 
             <LocationSearchField
@@ -289,6 +403,40 @@ export default function RoutesPage() {
               onFocus={() => setPickMode("to")}
               accent="to"
             />
+
+            {orderedStops.length > 0 && (
+              <div className="field">
+                <label>محطات التوقف ({orderedStops.length}) — مرتبة من البداية</label>
+                <ul className="stop-list">
+                  {orderedStops.map((stop, index) => (
+                    <li key={`${stop.latitude}-${stop.longitude}-${index}`}>
+                      <span>
+                        {index + 1}. {stop.address.split(",")[0]}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        onClick={() =>
+                          setIntermediateStops((prev) =>
+                            prev.filter(
+                              (s) =>
+                                s.latitude !== stop.latitude ||
+                                s.longitude !== stop.longitude
+                            )
+                          )
+                        }
+                      >
+                        حذف
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <p className="map-hint">
+              البداية والنهاية مطلوبتان. يمكنك إضافة محطات توقف إضافية من الخريطة.
+            </p>
 
             <div className="field">
               <label>اسم الخط</label>
@@ -309,6 +457,12 @@ export default function RoutesPage() {
                 required
               />
             </div>
+
+            {fromLocation && toLocation && (
+              <p className="route-stats">
+                {createStationTotal} محطة (بداية + {orderedStops.length} وسيطة + نهاية)
+              </p>
+            )}
 
             {routeMeta.roadRoute && (
               <p className="route-stats">
@@ -351,8 +505,14 @@ export default function RoutesPage() {
                 {formatDuration(detailRoute.roadRoute.durationSeconds)}
               </p>
             )}
-            {stops.length > 0 && (
-              <p className="map-hint">{stops.length} محطة وسيطة</p>
+            {selectedRoute && (
+              <p className="map-hint">
+                {totalStationCount(stops.length, {
+                  hasFrom: !!selectedRoute.fromLocation,
+                  hasTo: !!selectedRoute.toLocation,
+                })}{" "}
+                محطة (بداية + {stops.length} وسيطة + نهاية)
+              </p>
             )}
           </div>
         )}
@@ -370,7 +530,11 @@ export default function RoutesPage() {
             toLocation={mapTo}
             pickMode={panelMode === "create" ? pickMode : null}
             roadPolyline={mapPolyline}
-            extraMarkers={panelMode === "detail" ? mapMarkers.filter((m) => m.kind === "stop") : []}
+            extraMarkers={
+              panelMode === "detail"
+                ? mapMarkers.filter((m) => m.kind === "stop")
+                : createStopMarkers
+            }
             onMapPick={handleMapPick}
             onMarkerDrag={handleMarkerDrag}
           />

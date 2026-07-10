@@ -12,7 +12,7 @@ class OnboardingScale {
         padding = MediaQuery.paddingOf(context) {
     final widthScale = size.width / _designWidth;
     final heightScale = size.height / _designHeight;
-    factor = math.min(widthScale, heightScale).clamp(0.82, 1.18);
+    factor = math.min(widthScale, heightScale).clamp(0.72, 1.22);
     horizontalPadding = (size.width * 0.07).clamp(20.0, 32.0);
   }
 

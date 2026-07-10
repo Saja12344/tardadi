@@ -17,7 +17,7 @@ import "leaflet/dist/leaflet.css";
 import { MAP_TILES, ROUTE_LINE } from "@/lib/mapConfig";
 import { DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM, type MapMarker } from "@/lib/mapUtils";
 
-export type PickMode = "from" | "to" | null;
+export type PickMode = "from" | "to" | "stop" | null;
 
 const endpointIcon = (kind: "from" | "to") =>
   L.divIcon({

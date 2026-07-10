@@ -38,4 +38,6 @@ if [[ -z "$DEVICE_ID" ]]; then
 fi
 
 echo "Running Driver app on $DEVICE_ID"
+bash "$ROOT/scripts/set-sim-location.sh"
+
 flutter run -d "$DEVICE_ID"

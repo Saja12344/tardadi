@@ -22,13 +22,23 @@ function isValidPlace(place: LocationPlace): boolean {
 
 export async function fetchRoadRoute(
   from: LocationPlace,
-  to: LocationPlace
+  to: LocationPlace,
+  waypoints: LocationPlace[] = []
 ): Promise<RoadRouteResult> {
   if (!isValidPlace(from) || !isValidPlace(to)) {
     throw new Error("إحداثيات الموقع غير صحيحة. اختر الموقع من الخريطة مرة أخرى.");
   }
 
-  const coords = `${from.longitude},${from.latitude};${to.longitude},${to.latitude}`;
+  for (const point of waypoints) {
+    if (!isValidPlace(point)) {
+      throw new Error("إحداثيات إحدى المحطات غير صحيحة.");
+    }
+  }
+
+  const path = [from, ...waypoints, to];
+  const coords = path
+    .map((place) => `${place.longitude},${place.latitude}`)
+    .join(";");
   const params = new URLSearchParams({
     overview: "full",
     geometries: "geojson",

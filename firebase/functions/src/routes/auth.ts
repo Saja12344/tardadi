@@ -97,7 +97,20 @@ router.post("/driver-login", async (req, res) => {
       ...(doc.data() as Omit<Stop, "stopId" | "routeId">),
     }));
 
-    ok(res, { driver, bus, route, stops });
+    const activeTripSnapshot = await db
+      .collection(COLLECTIONS.organizations)
+      .doc(orgId)
+      .collection(COLLECTIONS.trips)
+      .where("busId", "==", driver.assignedBusId)
+      .where("tripStatus", "==", "active")
+      .limit(1)
+      .get();
+
+    const tripId = activeTripSnapshot.empty
+      ? null
+      : activeTripSnapshot.docs[0].id;
+
+    ok(res, { driver, bus, route, stops, tripId });
   } catch (error) {
     fail(res, (error as Error).message, 500);
   }

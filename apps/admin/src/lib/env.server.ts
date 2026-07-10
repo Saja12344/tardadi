@@ -4,7 +4,7 @@
  */
 
 const DEFAULT_API_URL =
-  "http://127.0.0.1:5001/demo-org/us-central1/api";
+  "http://127.0.0.1:5001/tardadi-5bd8e/us-central1/api";
 const DEFAULT_ORG_ID = "demo-org";
 
 /** Allowed API path prefixes for the admin BFF proxy (extend here as features grow). */
