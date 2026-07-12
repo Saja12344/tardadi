@@ -12,7 +12,7 @@ class OnboardingPrimaryButton extends StatelessWidget {
   });
 
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final OnboardingScale scale;
 
   @override
@@ -60,14 +60,16 @@ class OnboardingPageIndicator extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(count, (index) {
         final active = index == currentIndex;
-        return Container(
-          width: active ? scale.s(10) : scale.s(8),
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOutCubic,
+          width: active ? scale.s(22) : scale.s(8),
           height: scale.s(8),
           margin: EdgeInsets.symmetric(horizontal: scale.s(4)),
           decoration: BoxDecoration(
             color: active
                 ? OnboardingTheme.orange
-                : OnboardingTheme.white.withValues(alpha: 0.28),
+                : OnboardingTheme.cream.withValues(alpha: 0.35),
             borderRadius: BorderRadius.circular(999),
           ),
         );

@@ -60,7 +60,8 @@ class BusArrivalNotificationService {
     required int initialMinutes,
   }) async {
     if (!await AppPermissions.hasNotificationPermission()) {
-      final granted = await LocalNotificationService.instance.requestPermission();
+      // Request only when the user turns on the bell — never at app start.
+      final granted = await AppPermissions.requestNotificationPermission();
       if (!granted) {
         _showInAppFallback(_l10n.notificationsPermissionDenied);
         return;

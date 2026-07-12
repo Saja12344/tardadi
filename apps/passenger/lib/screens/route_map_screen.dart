@@ -7,7 +7,6 @@ import '../l10n/app_localizations.dart';
 import '../models/route_list_item.dart';
 import '../services/bus_arrival_notifications.dart';
 import '../widgets/left_back_button.dart';
-import '../widgets/onboarding/frosted_glass.dart';
 import '../widgets/onboarding/onboarding_theme.dart';
 import '../widgets/vehicle_icon.dart';
 
@@ -106,6 +105,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                 itemBuilder: (context, index) {
                   final bus = _buses[index];
                   return _BusArrivalCard(
+                    index: index,
                     item: bus,
                     notificationsEnabled: _notifications.isEnabled(bus.id),
                     onToggleNotifications: () => _toggleBell(bus),
@@ -212,145 +212,89 @@ class _RouteMapCanvas extends StatelessWidget {
 
 class _BusArrivalCard extends StatelessWidget {
   const _BusArrivalCard({
+    required this.index,
     required this.item,
     required this.notificationsEnabled,
     required this.onToggleNotifications,
   });
 
+  final int index;
   final BusArrivalItem item;
   final bool notificationsEnabled;
   final VoidCallback onToggleNotifications;
 
   @override
   Widget build(BuildContext context) {
-    return FrostedGlass(
-      margin: const EdgeInsets.only(bottom: 12),
-      borderRadius: 16,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: _buildContent(context),
-    );
-  }
-
-  Widget _buildContent(BuildContext context) {
     final l10n = context.l10n;
 
-    const titleColor = OnboardingTheme.glassText;
-    final chipTextColor = OnboardingTheme.white.withValues(alpha: 0.92);
-    final chipIconColor = OnboardingTheme.white.withValues(alpha: 0.85);
-    const iconBackground = Color.fromRGBO(255, 255, 255, 0.10);
-    const iconBorder = Color.fromRGBO(255, 255, 255, 0.14);
-    const chipBackground = Color.fromRGBO(255, 255, 255, 0.08);
-    const chipBorder = Color.fromRGBO(255, 255, 255, 0.12);
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: iconBackground,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: iconBorder),
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: 320 + (index * 70)),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, (1 - value) * 10),
+            child: child,
           ),
-          alignment: Alignment.center,
-          child: VehicleIcon(
-            vehicleType: item.vehicleType,
-            color: chipIconColor,
-            size: 34,
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.08),
           ),
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                l10n.vehicleLabel(item.vehicleType, item.name),
-                style: GoogleFonts.ubuntu(
-                  color: titleColor,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
-                  height: 1.15,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+        child: Row(
+          children: [
+            VehicleIcon(
+              vehicleType: item.vehicleType,
+              color: OnboardingTheme.orange,
+              size: 32,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _ArrivalDetailChip(
-                    icon: Icons.schedule_rounded,
-                    label: l10n.minutesLabel(item.minutesAway),
-                    textColor: chipTextColor,
-                    iconColor: chipIconColor,
-                    backgroundColor: chipBackground,
-                    borderColor: chipBorder,
+                  Text(
+                    l10n.vehicleLabel(item.vehicleType, item.name),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.ubuntu(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      height: 1.2,
+                    ),
                   ),
-                  _ArrivalDetailChip(
-                    icon: Icons.groups_2_rounded,
-                    label: l10n.crowdingLabel(item.crowdingLabel),
-                    textColor: chipTextColor,
-                    iconColor: chipIconColor,
-                    backgroundColor: chipBackground,
-                    borderColor: chipBorder,
+                  const SizedBox(height: 4),
+                  Text(
+                    '${l10n.minutesLabel(item.minutesAway)} · ${l10n.crowdingLabel(item.crowdingLabel)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.ubuntu(
+                      color: OnboardingTheme.muted,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                      height: 1.2,
+                    ),
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 10),
-        _NotificationBellButton(
-          enabled: notificationsEnabled,
-          onTap: onToggleNotifications,
-        ),
-      ],
-    );
-  }
-}
-
-class _ArrivalDetailChip extends StatelessWidget {
-  const _ArrivalDetailChip({
-    required this.icon,
-    required this.label,
-    required this.textColor,
-    required this.iconColor,
-    required this.backgroundColor,
-    required this.borderColor,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color textColor;
-  final Color iconColor;
-  final Color backgroundColor;
-  final Color borderColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: iconColor),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: GoogleFonts.ubuntu(
-              color: textColor,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              height: 1.1,
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            _NotificationBellButton(
+              enabled: notificationsEnabled,
+              onTap: onToggleNotifications,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -371,25 +315,12 @@ class _NotificationBellButton extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: enabled
-                ? OnboardingTheme.orange
-                : OnboardingTheme.background.withValues(alpha: 0.35),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: enabled
-                  ? OnboardingTheme.orange
-                  : OnboardingTheme.muted.withValues(alpha: 0.35),
-              width: 1.5,
-            ),
-          ),
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
           child: Icon(
             enabled ? Icons.notifications : Icons.notifications_outlined,
-            color: enabled ? Colors.white : OnboardingTheme.muted,
+            color: enabled ? OnboardingTheme.orange : OnboardingTheme.muted,
             size: 22,
           ),
         ),

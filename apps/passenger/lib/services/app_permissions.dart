@@ -1,4 +1,3 @@
-import 'package:flutter/scheduler.dart';
 import 'package:geolocator/geolocator.dart';
 
 import 'local_notification_service.dart';
@@ -6,26 +5,27 @@ import 'local_notification_service.dart';
 class AppPermissions {
   AppPermissions._();
 
-  /// Native system prompts shown at the end of onboarding.
-  static Future<void> requestOnboardingPermissions({
-    required bool requestLocation,
-  }) async {
-    await LocalNotificationService.instance.initialize();
+  /// Native OS location prompt only — shown after map onboarding.
+  static Future<void> requestOnboardingLocation() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
 
-    // Let the custom dialog close before showing OS sheets.
-    await SchedulerBinding.instance.endOfFrame;
-    await Future<void>.delayed(const Duration(milliseconds: 350));
+    final current = await Geolocator.checkPermission();
+    if (current == LocationPermission.whileInUse ||
+        current == LocationPermission.always) {
+      return;
+    }
 
-    await LocalNotificationService.instance.requestPermission();
+    if (current == LocationPermission.deniedForever) return;
 
-    if (!requestLocation) return;
-
-    // Android/iOS need a beat between consecutive permission dialogs.
-    await Future<void>.delayed(const Duration(milliseconds: 450));
     await Geolocator.requestPermission();
   }
 
   static Future<bool> hasNotificationPermission() {
     return LocalNotificationService.instance.hasPermission();
+  }
+
+  static Future<bool> requestNotificationPermission() {
+    return LocalNotificationService.instance.requestPermission();
   }
 }

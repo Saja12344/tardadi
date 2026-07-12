@@ -30,10 +30,10 @@ class OnboardingScale {
   double get splashLogoSize => s(44);
 
   double get illustrationWidth =>
-      (size.width - horizontalPadding * 2).clamp(280.0, 360.0);
+      (size.width - horizontalPadding * 2).clamp(300.0, 380.0);
 
   double get illustrationHeight =>
-      math.min(illustrationWidth * 0.78, size.height * 0.38);
+      math.min(illustrationWidth * 0.86, size.height * 0.42);
 
   double get onboardingTitleSize => s(22);
 

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'onboarding_theme.dart';
+import 'tardadi_mark.dart';
 
 class _MapStop {
   const _MapStop({
@@ -162,43 +163,36 @@ class _MapIllustrationState extends State<MapIllustration>
     return SizedBox(
       width: widget.width,
       height: widget.height,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) {
-            final size = Size(widget.width, widget.height);
-            final routePoints = _routePoints(size);
-            final stops = _stopsFor(size);
-            final logoCenter = _pointOnPolyline(routePoints, _controller.value);
-            final logoAngle = _segmentAngleAt(routePoints, _controller.value);
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          final size = Size(widget.width, widget.height);
+          final routePoints = _routePoints(size);
+          final stops = _stopsFor(size);
+          final logoCenter = _pointOnPolyline(routePoints, _controller.value);
+          final logoAngle = _segmentAngleAt(routePoints, _controller.value);
 
-            return Stack(
-              clipBehavior: Clip.hardEdge,
-              children: [
-                CustomPaint(
-                  size: size,
-                  painter: _MapIllustrationPainter(
-                    progress: _controller.value,
-                    stops: stops,
-                  ),
+          return Stack(
+            clipBehavior: Clip.hardEdge,
+            children: [
+              CustomPaint(
+                size: size,
+                painter: _MapIllustrationPainter(
+                  progress: _controller.value,
+                  stops: stops,
                 ),
+              ),
                 Positioned(
                   left: logoCenter.dx - logoSize / 2,
                   top: logoCenter.dy - logoSize / 2,
                   child: Transform.rotate(
                     angle: logoAngle,
-                    child: Image.asset(
-                      'assets/images/logo_icon.png',
-                      width: logoSize,
-                      height: logoSize,
-                    ),
+                    child: const TardadiMark(size: logoSize),
                   ),
                 ),
-              ],
-            );
-          },
-        ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -213,8 +207,9 @@ class _MapIllustrationPainter extends CustomPainter {
   final double progress;
   final List<_MapStop> stops;
 
-  static const _blockColor = Color(0xFFC8CDD8);
-  static const _streetColor = Color(0xFFF2F4F8);
+  static const _blockColor = OnboardingTheme.mapBlock;
+  static const _streetColor = OnboardingTheme.mapStreet;
+  static const _mapSurface = OnboardingTheme.mapSurface;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -222,7 +217,25 @@ class _MapIllustrationPainter extends CustomPainter {
 
     canvas.drawRect(
       Offset.zero & size,
-      Paint()..color = OnboardingTheme.background,
+      Paint()..color = _mapSurface,
+    );
+
+    // Soft cool bloom on the dark map.
+    canvas.drawCircle(
+      Offset(size.width * 0.5, size.height * 0.48),
+      size.width * 0.42,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            OnboardingTheme.mapStreet.withValues(alpha: 0.14),
+            Colors.transparent,
+          ],
+        ).createShader(
+          Rect.fromCircle(
+            center: Offset(size.width * 0.5, size.height * 0.48),
+            radius: size.width * 0.42,
+          ),
+        ),
     );
 
     _drawBlocks(canvas, grid);
@@ -353,7 +366,7 @@ class _MapIllustrationPainter extends CustomPainter {
     canvas.drawCircle(
       center,
       ringRadius * 0.42,
-      Paint()..color = Colors.white,
+      Paint()..color = OnboardingTheme.mapInk,
     );
 
     final textPainter = TextPainter(

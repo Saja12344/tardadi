@@ -60,20 +60,17 @@ class _LocationIllustrationState extends State<LocationIllustration>
     return SizedBox(
       width: widget.width,
       height: widget.height,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) {
-            return CustomPaint(
-              painter: _LocationIllustrationPainter(
-                progress: _controller.value,
-                stops: _stops,
-              ),
-              child: const SizedBox.expand(),
-            );
-          },
-        ),
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          return CustomPaint(
+            painter: _LocationIllustrationPainter(
+              progress: _controller.value,
+              stops: _stops,
+            ),
+            child: const SizedBox.expand(),
+          );
+        },
       ),
     );
   }
@@ -88,15 +85,33 @@ class _LocationIllustrationPainter extends CustomPainter {
   final double progress;
   final List<_NearbyStop> stops;
 
-  static const _blockColor = Color(0xFFC8CDD8);
-  static const _streetColor = Color(0xFFF2F4F8);
+  static const _blockColor = OnboardingTheme.mapBlock;
+  static const _streetColor = OnboardingTheme.mapStreet;
+  static const _mapSurface = OnboardingTheme.mapSurface;
   static const _userCenter = Offset(0.46, 0.50);
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.drawRect(
       Offset.zero & size,
-      Paint()..color = OnboardingTheme.background,
+      Paint()..color = _mapSurface,
+    );
+
+    canvas.drawCircle(
+      Offset(size.width * 0.46, size.height * 0.50),
+      size.width * 0.38,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            OnboardingTheme.mapStreet.withValues(alpha: 0.16),
+            Colors.transparent,
+          ],
+        ).createShader(
+          Rect.fromCircle(
+            center: Offset(size.width * 0.46, size.height * 0.50),
+            radius: size.width * 0.38,
+          ),
+        ),
     );
 
     _drawBlocks(canvas, size);
@@ -258,7 +273,7 @@ class _LocationIllustrationPainter extends CustomPainter {
     canvas.drawCircle(
       center,
       ringRadius * 0.38,
-      Paint()..color = Colors.white,
+      Paint()..color = OnboardingTheme.mapInk,
     );
 
     final textPainter = TextPainter(
@@ -300,7 +315,7 @@ class _LocationIllustrationPainter extends CustomPainter {
       center,
       size.width * 0.038,
       Paint()
-        ..color = Colors.white
+        ..color = OnboardingTheme.mapInk
         ..style = PaintingStyle.fill,
     );
 

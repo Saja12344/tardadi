@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'onboarding_theme.dart';
+import 'tardadi_mark.dart';
 
 class TardadiLogoIcon extends StatelessWidget {
   const TardadiLogoIcon({super.key, this.size = 28});
@@ -9,11 +10,7 @@ class TardadiLogoIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Image.asset(
-      'assets/images/logo_icon.png',
-      width: size,
-      height: size,
-    );
+    return TardadiMark(size: size);
   }
 }
 

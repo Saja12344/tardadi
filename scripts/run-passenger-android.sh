@@ -26,14 +26,29 @@ if ! command -v emulator >/dev/null 2>&1; then
   exit 1
 fi
 
-if [[ -z "$ANDROID_AVD" ]]; then
-  ANDROID_AVD="$(emulator -list-avds | head -1)"
+# Prefer an explicitly set AVD, then a real installed AVD matching the
+# default name, otherwise the first available emulator.
+if ! emulator -list-avds 2>/dev/null | grep -qx "$ANDROID_AVD"; then
+  if emulator -list-avds 2>/dev/null | grep -qx "Tardadi_Passenger"; then
+    ANDROID_AVD="Tardadi_Passenger"
+  else
+    ANDROID_AVD="$(emulator -list-avds 2>/dev/null | head -1 || true)"
+  fi
 fi
 
 if [[ -z "$ANDROID_AVD" ]]; then
   echo "No Android AVD found. Create one with:"
   echo "  avdmanager create avd -n Tardadi_Passenger -k \"system-images;android-34;google_apis;arm64-v8a\" -d pixel_7"
   exit 1
+fi
+
+# Prefer a physical Android/Huawei device when one is connected.
+PHYSICAL_ID="$(adb devices 2>/dev/null | awk '/\tdevice$/{print $1}' | grep -v '^emulator-' | head -1 || true)"
+
+if [[ -n "$PHYSICAL_ID" ]]; then
+  echo "Running passenger app on device $PHYSICAL_ID"
+  flutter run -d "$PHYSICAL_ID"
+  exit 0
 fi
 
 if ! adb devices 2>/dev/null | grep -qE '^emulator-'; then

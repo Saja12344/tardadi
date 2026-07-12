@@ -43,36 +43,21 @@ class AppLocalizations {
       isArabic ? 'وصل بدون تخمين' : 'GET THERE WITH LESS GUESSWORK';
 
   String get onboardingTitle1 =>
-      isArabic ? 'خطط رحلتك بسهولة' : 'Plan your trip with ease';
+      isArabic ? 'خطّط رحلتك بوضوح' : 'Plan your trip clearly';
 
   String get onboardingSubtitle1 => isArabic
-      ? 'محطات قريبة منك على الخريطة. بدون تخمين ولا انتظار.'
-      : 'Stops near you shown on the map. No guessing, no waiting, just go.';
+      ? 'شوف المسار والمحطات على الخريطة قبل ما تطلع.'
+      : 'See the route and stops on the map before you leave.';
 
   String get onboardingTitle2 =>
-      isArabic ? 'شوف المحطات حولك' : 'See stops around you';
+      isArabic ? 'المحطات حولك مباشرة' : 'Stops around you, instantly';
 
   String get onboardingSubtitle2 => isArabic
-      ? 'فعّل الموقع والإشعارات مرة واحدة لتصلك تنبيهات الباص وتظهر المحطات القريبة.'
-      : 'Allow location and notifications once to get bus alerts and nearby stops.';
+      ? 'فعّل الموقع عشان نعرض أقرب المحطات من مكانك.'
+      : 'Enable location so we can show the nearest stops to you.';
 
   String get allowLocation =>
-      isArabic ? 'متابعة' : 'Continue';
-
-  String get locationPermissionTitle => isArabic
-      ? 'السماح لـ "ترددي" باستخدام\nموقعك؟'
-      : "Allow 'Tardadi' to use\nyour location?";
-
-  String get locationPermissionBody => isArabic
-      ? 'سيُستخدم موقعك لعرض الأماكن القريبة وتحديثات المرور وتحديد موقعك.'
-      : 'Your location will be used to show you nearby places, '
-          'traffic updates, and find your location.';
-
-  String get allowOnce => isArabic ? 'السماح مرة واحدة' : 'Allow Once';
-  String get allowWhileUsingApp =>
-      isArabic ? 'السماح أثناء استخدام التطبيق' : 'Allow While Using App';
-  String get dontAllow => isArabic ? 'عدم السماح' : "Don't Allow";
-  String get preciseOn => isArabic ? 'دقة: مفعّلة' : 'Precise: On';
+      isArabic ? 'تفعيل الموقع' : 'Enable location';
 
   String get accountTypeTitle =>
       isArabic ? 'كيف ستستخدم التطبيق؟' : 'How will you use the application?';
@@ -134,8 +119,13 @@ class AppLocalizations {
   String get publicSection => isArabic ? 'عام' : 'Public';
 
   String minutesLabel(int minutes) => isArabic
-      ? '${minutes.toString().padLeft(2, '0')} د'
-      : '${minutes.toString().padLeft(2, '0')} min';
+      ? (minutes == 1 ? 'دقيقة واحدة' : '$minutes دقائق')
+      : (minutes == 1 ? '1 min' : '$minutes min');
+
+  String minutesUnit(int minutes) =>
+      isArabic ? (minutes == 1 ? 'دقيقة' : 'دقائق') : 'min';
+
+  String get crowdingTitle => isArabic ? 'الازدحام' : 'Crowding';
 
   String routeStopTitle(String routeName, String stopLabel) {
     final name = localizeRouteName(routeName);
@@ -175,9 +165,9 @@ class AppLocalizations {
 
   String crowdingLabel(String value) {
     return switch (value.toLowerCase()) {
-      'low' => isArabic ? 'منخفض' : 'Low',
-      'medium' => isArabic ? 'متوسط' : 'Medium',
-      'high' => isArabic ? 'مرتفع' : 'High',
+      'low' => isArabic ? 'فاضي' : 'Quiet',
+      'medium' => isArabic ? 'متوسط' : 'Moderate',
+      'high' => isArabic ? 'ممتلئ' : 'Crowded',
       _ => value,
     };
   }
@@ -186,7 +176,7 @@ class AppLocalizations {
     if (value.contains('Every') && value.contains('min')) {
       final match = RegExp(r'(\d+)').firstMatch(value);
       final minutes = match?.group(1) ?? '5';
-      return isArabic ? 'كل $minutes د' : value;
+      return isArabic ? 'كل $minutes دقائق' : value;
     }
     if (value.contains('Buses')) {
       final match = RegExp(r'(\d+)').firstMatch(value);

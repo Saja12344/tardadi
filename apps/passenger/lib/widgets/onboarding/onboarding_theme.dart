@@ -6,6 +6,17 @@ class OnboardingTheme {
   static const Color card = Color(0xFF1A1D5C);
   static const Color muted = Color(0xFF8B93B8);
   static const Color white = Color(0xFFFFFFFF);
+
+  /// Cool soft ice — no warm yellow/cream tint.
+  static const Color cream = Color(0xFFE8ECFF);
+
+  /// Dark navy map (the blue they liked).
+  static const Color mapSurface = Color(0xFF1A1F55);
+  static const Color mapBlock = Color(0xFF2C3270);
+  /// Cool frost streets — not peach, not sand, not yellow.
+  static const Color mapStreet = Color(0xFFB7C0E8);
+  static const Color mapInk = Color(0xFFE8ECFF);
+
   static const Color routeTitle = Color(0xFF13154B);
   static const Color routeMeta = Color(0xFF3D4566);
   /// Soft white with a slight blue tint — semi-transparent card fill.
