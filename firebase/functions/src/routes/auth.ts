@@ -2,13 +2,82 @@ import { Router } from "express";
 import { COLLECTIONS, normalizePhone } from "@tardadi/shared";
 import type { Driver, Bus, Route, Stop } from "@tardadi/shared";
 import { db } from "../firebase";
+import { getJwtSecret, signJwt, verifyPassword } from "../auth/crypto";
 import { fail, getOrgId, ok } from "../utils";
+import { withBusinessId } from "../auth/scope";
 
 const router = Router();
+
+router.post("/admin-login", async (req, res) => {
+  try {
+    const { phone, password } = req.body;
+
+    if (!phone || !password) {
+      fail(res, "اكتب رقم الجوال وكلمة المرور.");
+      return;
+    }
+
+    const normalizedPhone = normalizePhone(phone);
+    const snapshot = await db
+      .collection(COLLECTIONS.adminUsers)
+      .where("phone", "==", normalizedPhone)
+      .where("status", "==", "active")
+      .limit(1)
+      .get();
+
+    if (snapshot.empty) {
+      fail(res, "رقم الجوال أو كلمة المرور غير صحيحة.", 401);
+      return;
+    }
+
+    const userDoc = snapshot.docs[0];
+    const userData = userDoc.data();
+
+    if (!verifyPassword(password, userData.passwordHash as string)) {
+      fail(res, "رقم الجوال أو كلمة المرور غير صحيحة.", 401);
+      return;
+    }
+
+    if (userData.role === "business_admin" && userData.businessId) {
+      const businessDoc = await db
+        .collection(COLLECTIONS.businesses)
+        .doc(userData.businessId as string)
+        .get();
+      if (!businessDoc.exists || businessDoc.data()?.status !== "active") {
+        fail(res, "شركتك معطّلة. تواصل مع مدير النظام.", 403);
+        return;
+      }
+    }
+
+    const user = {
+      userId: userDoc.id,
+      name: userData.name as string,
+      phone: userData.phone as string,
+      role: userData.role as "super_admin" | "business_admin",
+      businessId: (userData.businessId as string | null) ?? null,
+    };
+
+    const token = signJwt(
+      {
+        sub: user.userId,
+        role: user.role,
+        businessId: user.businessId,
+        name: user.name,
+        phone: user.phone,
+      },
+      getJwtSecret()
+    );
+
+    ok(res, { token, user });
+  } catch (error) {
+    fail(res, (error as Error).message, 500);
+  }
+});
 
 router.post("/driver-login", async (req, res) => {
   try {
     const orgId = getOrgId(req);
+    const businessId = orgId;
     const { phone } = req.body;
 
     if (!phone) {
@@ -34,16 +103,15 @@ router.post("/driver-login", async (req, res) => {
 
     const driverDoc = driversSnapshot.docs[0];
     const driverData = driverDoc.data();
-    const driver: Driver = {
+    const driver: Driver = withBusinessId(businessId, {
       driverId: driverDoc.id,
-      organizationId: orgId,
       name: driverData.name,
       phone: driverData.phone,
       driverCode: driverData.driverCode,
       assignedRouteId: driverData.assignedRouteId,
       assignedBusId: driverData.assignedBusId,
       status: driverData.status,
-    };
+    }) as Driver;
 
     if (!driver.assignedRouteId || !driver.assignedBusId) {
       fail(res, "لم يتم تعيين خط أو باص لك بعد. تواصل مع الإدارة.", 403);
@@ -62,11 +130,10 @@ router.post("/driver-login", async (req, res) => {
       return;
     }
 
-    const bus: Bus = {
+    const bus: Bus = withBusinessId(businessId, {
       busId: busDoc.id,
-      organizationId: orgId,
-      ...(busDoc.data() as Omit<Bus, "busId" | "organizationId">),
-    };
+      ...(busDoc.data() as Omit<Bus, "busId" | "businessId" | "organizationId">),
+    }) as Bus;
 
     const routeDoc = await db
       .collection(COLLECTIONS.organizations)
@@ -80,11 +147,10 @@ router.post("/driver-login", async (req, res) => {
       return;
     }
 
-    const route: Route = {
+    const route: Route = withBusinessId(businessId, {
       routeId: routeDoc.id,
-      organizationId: orgId,
-      ...(routeDoc.data() as Omit<Route, "routeId" | "organizationId">),
-    };
+      ...(routeDoc.data() as Omit<Route, "routeId" | "businessId" | "organizationId">),
+    }) as Route;
 
     const stopsSnapshot = await routeDoc.ref
       .collection(COLLECTIONS.stops)

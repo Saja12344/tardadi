@@ -1,3 +1,5 @@
+import type { AdminRole } from "./rbac";
+
 export type EntityStatus = "active" | "inactive";
 export type TripStatus = "scheduled" | "active" | "ended";
 export type ReminderStatus = "active" | "triggered" | "cancelled";
@@ -15,6 +17,18 @@ export interface LocationPlace {
   longitude: number;
 }
 
+/** Transportation company workspace (Roshn, SAPTCO, etc.). */
+export interface Business {
+  businessId: string;
+  name: string;
+  logo?: string | null;
+  status: EntityStatus;
+  adminUserId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** @deprecated Use Business — kept for mobile app backward compatibility. */
 export interface Organization {
   organizationId: string;
   name: string;
@@ -25,8 +39,75 @@ export interface Organization {
   updatedAt?: string;
 }
 
+export interface BusinessListItem extends Business {
+  adminName?: string | null;
+  adminPhone?: string | null;
+  driverCount: number;
+  busCount: number;
+  routeCount: number;
+  stationCount: number;
+}
+
+export interface BusinessStats {
+  businessId: string;
+  driverCount: number;
+  busCount: number;
+  routeCount: number;
+  stationCount: number;
+  todayTripCount: number;
+}
+
+export interface AdminUser {
+  userId: string;
+  name: string;
+  phone: string;
+  role: AdminRole;
+  businessId: string | null;
+  status: EntityStatus;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AdminSession {
+  userId: string;
+  name: string;
+  phone: string;
+  role: AdminRole;
+  businessId: string | null;
+}
+
+export interface AdminLoginRequest {
+  phone: string;
+  password: string;
+}
+
+export interface AdminLoginResponse {
+  token: string;
+  user: AdminSession;
+}
+
+export interface CreateBusinessRequest {
+  name: string;
+  logo?: string | null;
+  status?: EntityStatus;
+  adminName: string;
+  adminPhone: string;
+  adminPassword: string;
+}
+
+export interface UpdateBusinessRequest {
+  name?: string;
+  logo?: string | null;
+  status?: EntityStatus;
+  adminName?: string;
+  adminPhone?: string;
+  adminPassword?: string;
+}
+
 export interface Driver {
   driverId: string;
+  businessId: string;
+  /** @deprecated Use businessId */
   organizationId: string;
   name: string;
   phone: string;
@@ -40,6 +121,8 @@ export interface Driver {
 
 export interface Bus {
   busId: string;
+  businessId: string;
+  /** @deprecated Use businessId */
   organizationId: string;
   plateNo: string;
   label: string;
@@ -56,6 +139,8 @@ export interface Bus {
 
 export interface Route {
   routeId: string;
+  businessId: string;
+  /** @deprecated Use businessId */
   organizationId: string;
   name: string;
   code: string;
@@ -84,6 +169,8 @@ export interface Stop {
 
 export interface Trip {
   tripId: string;
+  businessId: string;
+  /** @deprecated Use businessId */
   organizationId: string;
   busId: string;
   driverId: string;
@@ -107,6 +194,8 @@ export interface GpsLog {
 
 export interface Reminder {
   reminderId: string;
+  businessId: string;
+  /** @deprecated Use businessId */
   organizationId: string;
   userId: string;
   busId: string;

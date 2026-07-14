@@ -10,57 +10,48 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.role == 'super_admin';
     }
 
-    function isOrgAdmin(orgId) {
+    function isBusinessAdmin(businessId) {
       return isSignedIn()
-        && request.auth.token.role == 'organization_admin'
-        && request.auth.token.organizationId == orgId;
+        && request.auth.token.role == 'business_admin'
+        && request.auth.token.businessId == businessId;
     }
 
-    function isOrgUser(orgId) {
-      return isSignedIn() && request.auth.token.organizationId == orgId;
+  match /admin_users/{userId} {
+      allow read: if isSuperAdmin();
+      allow write: if isSuperAdmin();
     }
 
-    match /organizations/{orgId} {
-      allow read: if true;
+    match /businesses/{businessId} {
+      allow read: if isSuperAdmin() || isBusinessAdmin(businessId);
       allow create, update, delete: if isSuperAdmin();
-
-      match /organization_admins/{docId} {
-        allow read: if isSuperAdmin() || isOrgAdmin(orgId);
-        allow write: if isSuperAdmin();
-      }
-
-      match /users/{docId} {
-        allow read: if isSuperAdmin() || isOrgAdmin(orgId) || isOrgUser(orgId);
-        allow write: if isSuperAdmin() || isOrgAdmin(orgId);
-      }
 
       match /drivers/{docId} {
         allow read: if true;
-        allow write: if isSuperAdmin() || isOrgAdmin(orgId);
+        allow write: if isSuperAdmin() || isBusinessAdmin(businessId);
       }
 
       match /buses/{docId} {
         allow read: if true;
-        allow write: if isSuperAdmin() || isOrgAdmin(orgId);
+        allow write: if isSuperAdmin() || isBusinessAdmin(businessId);
       }
 
       match /routes/{routeId} {
         allow read: if true;
-        allow write: if isSuperAdmin() || isOrgAdmin(orgId);
+        allow write: if isSuperAdmin() || isBusinessAdmin(businessId);
 
         match /stops/{stopId} {
           allow read: if true;
-          allow write: if isSuperAdmin() || isOrgAdmin(orgId);
+          allow write: if isSuperAdmin() || isBusinessAdmin(businessId);
         }
       }
 
       match /trips/{tripId} {
         allow read: if true;
-        allow write: if isSuperAdmin() || isOrgAdmin(orgId);
+        allow write: if isSuperAdmin() || isBusinessAdmin(businessId);
 
         match /gps_logs/{logId} {
           allow read: if true;
-          allow create: if isSuperAdmin() || isOrgAdmin(orgId) || isOrgUser(orgId);
+          allow create: if isSuperAdmin() || isBusinessAdmin(businessId);
           allow update, delete: if false;
         }
       }
@@ -69,7 +60,7 @@ service cloud.firestore {
         allow read: if true;
         allow create: if true;
         allow update: if true;
-        allow delete: if isSuperAdmin() || isOrgAdmin(orgId);
+        allow delete: if isSuperAdmin() || isBusinessAdmin(businessId);
       }
     }
   }

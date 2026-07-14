@@ -1,10 +1,18 @@
 import type { Request, Response } from "express";
 import type { ApiResponse } from "@tardadi/shared";
 
+export function paramId(value: string | string[]): string {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+/** @deprecated Use resolveBusinessId from auth/scope */
 export function getOrgId(req: Request): string {
   return (
+    (req.query.businessId as string) ||
     (req.query.organizationId as string) ||
+    (req.body?.businessId as string) ||
     (req.body?.organizationId as string) ||
+    process.env.DEFAULT_BUSINESS_ID ||
     process.env.DEFAULT_ORGANIZATION_ID ||
     "demo-org"
   );

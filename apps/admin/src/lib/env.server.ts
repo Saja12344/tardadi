@@ -13,6 +13,7 @@ export const ADMIN_PROXY_ALLOWLIST = [
   "buses",
   "drivers",
   "trips",
+  "businesses",
   "health",
 ] as const;
 

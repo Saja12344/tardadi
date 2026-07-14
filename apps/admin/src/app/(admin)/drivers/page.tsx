@@ -5,8 +5,13 @@ import type { Bus, Driver, Route } from "@tardadi/shared";
 import { api } from "@/lib/api";
 import { adminFetch } from "@/lib/adminFetch";
 import { getUserErrorMessage } from "@/lib/errorMessage";
+import SelectInput from "@/components/SelectInput";
+import BusinessBadge from "@/components/BusinessBadge";
+import { useBusinessMap, useShowBusinessColumn } from "@/hooks/useBusinessMap";
 
 export default function DriversPage() {
+  const businessMap = useBusinessMap();
+  const showBusiness = useShowBusinessColumn();
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [buses, setBuses] = useState<Bus[]>([]);
@@ -102,7 +107,7 @@ export default function DriversPage() {
 
           <div className="field">
             <label>الخط المسموح</label>
-            <select
+            <SelectInput
               value={assignedRouteId}
               onChange={(e) => setAssignedRouteId(e.target.value)}
               required
@@ -110,15 +115,18 @@ export default function DriversPage() {
               <option value="">اختر الخط</option>
               {routes.map((route) => (
                 <option key={route.routeId} value={route.routeId}>
+                  {showBusiness && businessMap[route.businessId]
+                    ? `${businessMap[route.businessId]} · `
+                    : ""}
                   {route.name}
                 </option>
               ))}
-            </select>
+            </SelectInput>
           </div>
 
           <div className="field">
             <label>الباص المعيّن</label>
-            <select
+            <SelectInput
               value={assignedBusId}
               onChange={(e) => setAssignedBusId(e.target.value)}
               required
@@ -126,10 +134,13 @@ export default function DriversPage() {
               <option value="">اختر الباص</option>
               {buses.map((bus) => (
                 <option key={bus.busId} value={bus.busId}>
+                  {showBusiness && businessMap[bus.businessId]
+                    ? `${businessMap[bus.businessId]} · `
+                    : ""}
                   {bus.label}
                 </option>
               ))}
-            </select>
+            </SelectInput>
           </div>
 
           {buses.length === 0 && (
@@ -150,25 +161,38 @@ export default function DriversPage() {
               <tr>
                 <th>الاسم</th>
                 <th>الجوال</th>
+                {showBusiness && <th>الشركة</th>}
                 <th>الخط</th>
                 <th>الباص</th>
               </tr>
             </thead>
             <tbody>
-              {drivers.map((driver) => (
-                <tr key={driver.driverId}>
-                  <td>{driver.name}</td>
-                  <td>{driver.phone}</td>
-                  <td>
-                    {routes.find((r) => r.routeId === driver.assignedRouteId)
-                      ?.name || "—"}
-                  </td>
-                  <td>
-                    {buses.find((b) => b.busId === driver.assignedBusId)?.label ||
-                      "—"}
-                  </td>
-                </tr>
-              ))}
+              {drivers.map((driver) => {
+                const routeName =
+                  routes.find((r) => r.routeId === driver.assignedRouteId)?.name ||
+                  "—";
+                const busLabel =
+                  buses.find((b) => b.busId === driver.assignedBusId)?.label ||
+                  "—";
+                const businessName =
+                  businessMap[driver.businessId] || driver.businessId || "—";
+
+                return (
+                  <tr key={driver.driverId}>
+                    <td>{driver.name}</td>
+                    <td dir="ltr">{driver.phone}</td>
+                    {showBusiness && (
+                      <td>
+                        <BusinessBadge name={businessName} />
+                      </td>
+                    )}
+                    <td>
+                      <span className="chip chip-route">{routeName}</span>
+                    </td>
+                    <td>{busLabel}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

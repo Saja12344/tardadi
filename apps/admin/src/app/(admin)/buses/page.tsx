@@ -5,8 +5,12 @@ import type { Bus } from "@tardadi/shared";
 import { api } from "@/lib/api";
 import { adminFetch } from "@/lib/adminFetch";
 import { getUserErrorMessage } from "@/lib/errorMessage";
+import BusinessBadge from "@/components/BusinessBadge";
+import { useBusinessMap, useShowBusinessColumn } from "@/hooks/useBusinessMap";
 
 export default function BusesPage() {
+  const businessMap = useBusinessMap();
+  const showBusiness = useShowBusinessColumn();
   const [buses, setBuses] = useState<Bus[]>([]);
   const [plateNo, setPlateNo] = useState("");
   const [label, setLabel] = useState("");
@@ -88,6 +92,7 @@ export default function BusesPage() {
           <table>
             <thead>
               <tr>
+                {showBusiness && <th>الشركة</th>}
                 <th>الاسم</th>
                 <th>اللوحة</th>
                 <th>الحالة</th>
@@ -96,6 +101,13 @@ export default function BusesPage() {
             <tbody>
               {buses.map((bus) => (
                 <tr key={bus.busId}>
+                  {showBusiness && (
+                    <td>
+                      <BusinessBadge
+                        name={businessMap[bus.businessId] || bus.businessId}
+                      />
+                    </td>
+                  )}
                   <td>{bus.label}</td>
                   <td>{bus.plateNo}</td>
                   <td>{bus.status}</td>

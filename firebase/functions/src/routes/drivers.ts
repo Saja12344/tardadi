@@ -1,44 +1,61 @@
 import { Router } from "express";
 import { COLLECTIONS, normalizePhone } from "@tardadi/shared";
 import { db } from "../firebase";
-import { fail, getOrgId, ok } from "../utils";
+import { optionalAdminWithPermission } from "../auth/middleware";
+import { resolveBusinessId, requireBusinessId, withBusinessId } from "../auth/scope";
+import {
+  listAccessibleBusinessIds,
+  mapAcrossBusinesses,
+} from "../business/access";
+import { businessRef } from "../business/helpers";
+import { fail, ok, paramId } from "../utils";
 
 const router = Router();
 
-router.get("/", async (req, res) => {
-  try {
-    const orgId = getOrgId(req);
-    const snapshot = await db
-      .collection(COLLECTIONS.organizations)
-      .doc(orgId)
-      .collection(COLLECTIONS.drivers)
-      .get();
+async function listDriversForBusiness(businessId: string) {
+  const snapshot = await businessRef(db, businessId)
+    .collection(COLLECTIONS.drivers)
+    .get();
 
-    const drivers = snapshot.docs.map((doc) => ({
+  return snapshot.docs.map((doc) =>
+    withBusinessId(businessId, {
       driverId: doc.id,
-      organizationId: orgId,
       ...doc.data(),
-    }));
+    })
+  );
+}
 
+router.get("/", optionalAdminWithPermission("drivers:read"), async (req, res) => {
+  try {
+    const businessId = resolveBusinessId(req, req.adminAuth);
+    const businessIds = await listAccessibleBusinessIds(
+      db,
+      req.adminAuth,
+      businessId
+    );
+    const drivers = await mapAcrossBusinesses(db, businessIds, listDriversForBusiness);
     ok(res, drivers);
   } catch (error) {
-    fail(res, (error as Error).message, 500);
+    const err = error as Error & { status?: number };
+    fail(res, err.message, err.status ?? 500);
   }
 });
 
 router.get("/me", async (req, res) => {
   try {
-    const orgId = getOrgId(req);
-    const driverId = req.query.driverId as string;
+    const businessId = resolveBusinessId(req, req.adminAuth);
+    if (!businessId) {
+      fail(res, "حدّد الشركة أولاً.");
+      return;
+    }
 
+    const driverId = req.query.driverId as string;
     if (!driverId) {
       fail(res, "driverId is required");
       return;
     }
 
-    const driverDoc = await db
-      .collection(COLLECTIONS.organizations)
-      .doc(orgId)
+    const driverDoc = await businessRef(db, businessId)
       .collection(COLLECTIONS.drivers)
       .doc(driverId)
       .get();
@@ -48,16 +65,22 @@ router.get("/me", async (req, res) => {
       return;
     }
 
-    const driver = { driverId, organizationId: orgId, ...driverDoc.data() };
-    ok(res, driver);
+    ok(
+      res,
+      withBusinessId(businessId, {
+        driverId,
+        ...driverDoc.data(),
+      })
+    );
   } catch (error) {
-    fail(res, (error as Error).message, 500);
+    const err = error as Error & { status?: number };
+    fail(res, err.message, err.status ?? 500);
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", optionalAdminWithPermission("drivers:write"), async (req, res) => {
   try {
-    const orgId = getOrgId(req);
+    const businessId = requireBusinessId(req, req.adminAuth);
     const {
       name,
       phone,
@@ -73,9 +96,7 @@ router.post("/", async (req, res) => {
 
     const normalizedPhone = normalizePhone(phone);
 
-    const existing = await db
-      .collection(COLLECTIONS.organizations)
-      .doc(orgId)
+    const existing = await businessRef(db, businessId)
       .collection(COLLECTIONS.drivers)
       .where("phone", "==", normalizedPhone)
       .limit(1)
@@ -87,9 +108,7 @@ router.post("/", async (req, res) => {
     }
 
     const now = new Date().toISOString();
-    const docRef = await db
-      .collection(COLLECTIONS.organizations)
-      .doc(orgId)
+    const docRef = await businessRef(db, businessId)
       .collection(COLLECTIONS.drivers)
       .add({
         name,
@@ -104,62 +123,63 @@ router.post("/", async (req, res) => {
 
     ok(
       res,
-      {
+      withBusinessId(businessId, {
         driverId: docRef.id,
-        organizationId: orgId,
         name,
         phone: normalizedPhone,
         assignedRouteId,
         assignedBusId,
         status,
-      },
+      }),
       201
     );
   } catch (error) {
-    fail(res, (error as Error).message, 500);
+    const err = error as Error & { status?: number };
+    fail(res, err.message, err.status ?? 500);
   }
 });
 
-router.put("/:driverId", async (req, res) => {
+router.put("/:driverId", optionalAdminWithPermission("drivers:write"), async (req, res) => {
   try {
-    const orgId = getOrgId(req);
-    const { driverId } = req.params;
+    const businessId = requireBusinessId(req, req.adminAuth);
+    const { driverId: rawDriverId } = req.params;
+    const driverId = paramId(rawDriverId);
     const updates = { ...req.body, updatedAt: new Date().toISOString() };
     delete updates.organizationId;
+    delete updates.businessId;
     delete updates.driverId;
 
     if (updates.phone) {
       updates.phone = normalizePhone(updates.phone);
     }
 
-    await db
-      .collection(COLLECTIONS.organizations)
-      .doc(orgId)
+    await businessRef(db, businessId)
       .collection(COLLECTIONS.drivers)
       .doc(driverId)
       .update(updates);
 
-    ok(res, { driverId, ...updates });
+    ok(res, withBusinessId(businessId, { driverId, ...updates }));
   } catch (error) {
-    fail(res, (error as Error).message, 500);
+    const err = error as Error & { status?: number };
+    fail(res, err.message, err.status ?? 500);
   }
 });
 
-router.delete("/:driverId", async (req, res) => {
+router.delete("/:driverId", optionalAdminWithPermission("drivers:write"), async (req, res) => {
   try {
-    const orgId = getOrgId(req);
-    const { driverId } = req.params;
+    const businessId = requireBusinessId(req, req.adminAuth);
+    const { driverId: rawDriverId } = req.params;
+    const driverId = paramId(rawDriverId);
 
-    await db
-      .collection(COLLECTIONS.organizations)
-      .doc(orgId)
+    await businessRef(db, businessId)
       .collection(COLLECTIONS.drivers)
       .doc(driverId)
       .delete();
 
     ok(res, { driverId, deleted: true });
   } catch (error) {
-    fail(res, (error as Error).message, 500);
+    const err = error as Error & { status?: number };
+    fail(res, err.message, err.status ?? 500);
   }
 });
 

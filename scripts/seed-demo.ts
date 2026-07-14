@@ -1,15 +1,25 @@
 /**
- * Seed demo data into Firestore emulator.
+ * Seed demo data + RBAC users into Firestore emulator.
  * Run: npx ts-node scripts/seed-demo.ts
  * Requires FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
  */
 
 import * as admin from "firebase-admin";
+import { randomBytes, scryptSync } from "crypto";
 
-const ORG_ID = "demo-org";
+const PROJECT_ID = process.env.GCLOUD_PROJECT || "tardadi-5bd8e";
+const BUSINESS_ID = "demo-org";
+
+function hashPassword(password: string): string {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 }).toString(
+    "hex"
+  );
+  return `scrypt:${salt}:${hash}`;
+}
 
 if (!admin.apps.length) {
-  admin.initializeApp({ projectId: "demo-org" });
+  admin.initializeApp({ projectId: PROJECT_ID });
 }
 
 const db = admin.firestore();
@@ -17,18 +27,42 @@ const db = admin.firestore();
 async function seed() {
   const now = new Date().toISOString();
 
-  await db.collection("organizations").doc(ORG_ID).set({
+  // Super Admin
+  await db.collection("admin_users").doc("super-admin").set({
+    name: "مدير النظام",
+    phone: "+966500000001",
+    passwordHash: hashPassword("admin123"),
+    role: "super_admin",
+    businessId: null,
+    status: "active",
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  // Demo business (Roshn-style)
+  await db.collection("businesses").doc(BUSINESS_ID).set({
     name: "ترددي Demo",
-    type: "company",
-    accessMode: "public",
+    logo: null,
+    status: "active",
+    adminUserId: "demo-business-admin",
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  await db.collection("admin_users").doc("demo-business-admin").set({
+    name: "أحمد",
+    phone: "+966538783273",
+    passwordHash: hashPassword("demo123"),
+    role: "business_admin",
+    businessId: BUSINESS_ID,
     status: "active",
     createdAt: now,
     updatedAt: now,
   });
 
   const routeRef = await db
-    .collection("organizations")
-    .doc(ORG_ID)
+    .collection("businesses")
+    .doc(BUSINESS_ID)
     .collection("routes")
     .add({
       name: "الخط أ",
@@ -62,8 +96,8 @@ async function seed() {
   });
 
   const busRef = await db
-    .collection("organizations")
-    .doc(ORG_ID)
+    .collection("businesses")
+    .doc(BUSINESS_ID)
     .collection("buses")
     .add({
       plateNo: "ABC-1234",
@@ -77,8 +111,8 @@ async function seed() {
     });
 
   const driverRef = await db
-    .collection("organizations")
-    .doc(ORG_ID)
+    .collection("businesses")
+    .doc(BUSINESS_ID)
     .collection("drivers")
     .add({
       driverCode: "DRV-102",
@@ -91,12 +125,20 @@ async function seed() {
       updatedAt: now,
     });
 
-  console.log("✅ Demo data seeded:");
-  console.log(`  organizationId: ${ORG_ID}`);
+  console.log("✅ Demo data + RBAC seeded:");
+  console.log("");
+  console.log("Super Admin:");
+  console.log("  phone: 0500000001");
+  console.log("  password: admin123");
+  console.log("");
+  console.log("Business Admin (Demo company):");
+  console.log("  phone: 0538783273");
+  console.log("  password: demo123");
+  console.log("");
+  console.log(`  businessId: ${BUSINESS_ID}`);
   console.log(`  routeId: ${routeRef.id}`);
   console.log(`  busId: ${busRef.id}`);
   console.log(`  driverId: ${driverRef.id}`);
-  console.log(`  driverCode: DRV-102`);
 }
 
 seed().catch(console.error);

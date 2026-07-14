@@ -16,6 +16,8 @@ import { decodePolyline } from "@/lib/routing";
 import { routeEndpointsToMarkers, stopsToMarkers } from "@/lib/mapUtils";
 import { sortPlacesAlongRoute } from "@/lib/routeOrdering";
 import { getUserErrorMessage } from "@/lib/errorMessage";
+import BusinessBadge from "@/components/BusinessBadge";
+import { useBusinessMap, useShowBusinessColumn } from "@/hooks/useBusinessMap";
 
 type PanelMode = "list" | "create" | "detail";
 
@@ -40,6 +42,8 @@ async function reverseGeocode(
 }
 
 export default function RoutesPage() {
+  const businessMap = useBusinessMap();
+  const showBusiness = useShowBusinessColumn();
   const [panelMode, setPanelMode] = useState<PanelMode>("list");
   const [routes, setRoutes] = useState<Route[]>([]);
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
@@ -229,6 +233,32 @@ export default function RoutesPage() {
     hasTo: !!toLocation,
   });
 
+  function renderRouteItem(route: Route) {
+    const businessName = businessMap[route.businessId];
+
+    return (
+      <button
+        key={route.routeId}
+        type="button"
+        className={`route-list-item ${selectedRouteId === route.routeId ? "active" : ""}`}
+        onClick={() => loadRouteDetail(route.routeId)}
+      >
+        <div className="route-list-top">
+          <strong>{route.name}</strong>
+          <span className="route-list-code">{route.code}</span>
+        </div>
+        {showBusiness && businessName && (
+          <BusinessBadge name={businessName} />
+        )}
+        {route.fromLocation && route.toLocation && (
+          <span className="route-list-path">
+            {route.fromLocation.address.split(",")[0]} →{" "}
+            {route.toLocation.address.split(",")[0]}
+          </span>
+        )}
+      </button>
+    );
+  }
   const publicRoutes = useMemo(
     () => routes.filter((route) => route.accessMode !== "private"),
     [routes]
@@ -293,46 +323,14 @@ export default function RoutesPage() {
                 {businessRoutes.length > 0 && (
                   <>
                     <h2 className="routes-section-title">خطوط الأعمال</h2>
-                    {businessRoutes.map((route) => (
-                      <button
-                        key={route.routeId}
-                        type="button"
-                        className={`route-list-item ${selectedRouteId === route.routeId ? "active" : ""}`}
-                        onClick={() => loadRouteDetail(route.routeId)}
-                      >
-                        <strong>{route.name}</strong>
-                        <span className="route-list-code">{route.code}</span>
-                        {route.fromLocation && route.toLocation && (
-                          <span className="route-list-path">
-                            {route.fromLocation.address.split(",")[0]} →{" "}
-                            {route.toLocation.address.split(",")[0]}
-                          </span>
-                        )}
-                      </button>
-                    ))}
+                    {businessRoutes.map((route) => renderRouteItem(route))}
                   </>
                 )}
                 <h2 className="routes-section-title">الخطوط العامة</h2>
                 {publicRoutes.length === 0 ? (
                   <p className="map-hint">لا توجد خطوط عامة بعد</p>
                 ) : (
-                  publicRoutes.map((route) => (
-                    <button
-                      key={route.routeId}
-                      type="button"
-                      className={`route-list-item ${selectedRouteId === route.routeId ? "active" : ""}`}
-                      onClick={() => loadRouteDetail(route.routeId)}
-                    >
-                      <strong>{route.name}</strong>
-                      <span className="route-list-code">{route.code}</span>
-                      {route.fromLocation && route.toLocation && (
-                        <span className="route-list-path">
-                          {route.fromLocation.address.split(",")[0]} →{" "}
-                          {route.toLocation.address.split(",")[0]}
-                        </span>
-                      )}
-                    </button>
-                  ))
+                  publicRoutes.map((route) => renderRouteItem(route))
                 )}
               </>
             )}

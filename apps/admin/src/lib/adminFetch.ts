@@ -28,5 +28,5 @@ export async function adminFetch<T = unknown>(
     );
   }
 
-  return body.data as T;
+  return (body.data ?? null) as T;
 }

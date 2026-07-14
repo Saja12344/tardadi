@@ -14,7 +14,11 @@ export const GEOFENCE_MAX_DISTANCE_M = 500;
 export const DEFAULT_REMINDER_MINUTES = 5;
 
 export const COLLECTIONS = {
-  organizations: "organizations",
+  /** Primary tenant collection — each doc is a Business workspace. */
+  businesses: "businesses",
+  /** @deprecated Alias for businesses — used during migration. */
+  organizations: "businesses",
+  adminUsers: "admin_users",
   drivers: "drivers",
   buses: "buses",
   routes: "routes",
@@ -24,13 +28,26 @@ export const COLLECTIONS = {
   reminders: "reminders",
 } as const;
 
-export function orgPath(organizationId: string): string {
-  return `${COLLECTIONS.organizations}/${organizationId}`;
+export function businessPath(businessId: string): string {
+  return `${COLLECTIONS.businesses}/${businessId}`;
 }
 
+export function businessSubcollection(
+  businessId: string,
+  subcollection: string
+): string {
+  return `${businessPath(businessId)}/${subcollection}`;
+}
+
+/** @deprecated Use businessPath */
+export function orgPath(organizationId: string): string {
+  return businessPath(organizationId);
+}
+
+/** @deprecated Use businessSubcollection */
 export function orgSubcollection(
   organizationId: string,
   subcollection: string
 ): string {
-  return `${orgPath(organizationId)}/${subcollection}`;
+  return businessSubcollection(organizationId, subcollection);
 }

@@ -1,7 +1,14 @@
 import { Router } from "express";
 import { COLLECTIONS, totalStationCount } from "@tardadi/shared";
 import { db } from "../firebase";
-import { fail, getOrgId, ok } from "../utils";
+import { optionalAdminWithPermission } from "../auth/middleware";
+import { resolveBusinessId, requireBusinessId, withBusinessId } from "../auth/scope";
+import {
+  listAccessibleBusinessIds,
+  mapAcrossBusinesses,
+} from "../business/access";
+import { businessRef } from "../business/helpers";
+import { fail, ok, paramId } from "../utils";
 
 const router = Router();
 
@@ -14,79 +21,84 @@ function isRecentlyUpdated(lastSeenAt: string | null | undefined): boolean {
   return Date.now() - seen <= LIVE_GPS_WINDOW_MS;
 }
 
-router.get("/", async (req, res) => {
-  try {
-    const orgId = getOrgId(req);
-    const orgRef = db.collection(COLLECTIONS.organizations).doc(orgId);
+async function listRoutesForBusiness(businessId: string) {
+  const bizRef = businessRef(db, businessId);
+  const [routesSnapshot, tripsSnapshot, busesSnapshot] = await Promise.all([
+    bizRef.collection(COLLECTIONS.routes).get(),
+    bizRef.collection(COLLECTIONS.trips).where("tripStatus", "==", "active").get(),
+    bizRef.collection(COLLECTIONS.buses).get(),
+  ]);
 
-    const [routesSnapshot, tripsSnapshot, busesSnapshot] = await Promise.all([
-      orgRef.collection(COLLECTIONS.routes).get(),
-      orgRef.collection(COLLECTIONS.trips).where("tripStatus", "==", "active").get(),
-      orgRef.collection(COLLECTIONS.buses).get(),
-    ]);
+  const busById = new Map(
+    busesSnapshot.docs.map((doc) => [
+      doc.id,
+      { busId: doc.id, ...doc.data() } as { busId: string; lastSeenAt?: string },
+    ])
+  );
 
-    const busById = new Map(
-      busesSnapshot.docs.map((doc) => [
-        doc.id,
-        { busId: doc.id, ...doc.data() } as { busId: string; lastSeenAt?: string },
-      ])
-    );
+  const activeTripsByRoute = new Map<string, typeof tripsSnapshot.docs>();
+  for (const tripDoc of tripsSnapshot.docs) {
+    const routeId = tripDoc.data().routeId as string;
+    const list = activeTripsByRoute.get(routeId) ?? [];
+    list.push(tripDoc);
+    activeTripsByRoute.set(routeId, list);
+  }
 
-    const activeTripsByRoute = new Map<string, typeof tripsSnapshot.docs>();
-    for (const tripDoc of tripsSnapshot.docs) {
-      const routeId = tripDoc.data().routeId as string;
-      const list = activeTripsByRoute.get(routeId) ?? [];
-      list.push(tripDoc);
-      activeTripsByRoute.set(routeId, list);
-    }
+  return Promise.all(
+    routesSnapshot.docs.map(async (doc) => {
+      const routeId = doc.id;
+      const stopsSnapshot = await doc.ref.collection(COLLECTIONS.stops).get();
+      const activeTrips = activeTripsByRoute.get(routeId) ?? [];
+      let liveBusCount = 0;
 
-    const routes = await Promise.all(
-      routesSnapshot.docs.map(async (doc) => {
-        const routeId = doc.id;
-        const stopsSnapshot = await doc.ref.collection(COLLECTIONS.stops).get();
-        const activeTrips = activeTripsByRoute.get(routeId) ?? [];
-        let liveBusCount = 0;
-
-        for (const tripDoc of activeTrips) {
-          const busId = tripDoc.data().busId as string;
-          const bus = busById.get(busId);
-          if (bus && isRecentlyUpdated(bus.lastSeenAt as string | undefined)) {
-            liveBusCount += 1;
-          }
+      for (const tripDoc of activeTrips) {
+        const busId = tripDoc.data().busId as string;
+        const bus = busById.get(busId);
+        if (bus && isRecentlyUpdated(bus.lastSeenAt as string | undefined)) {
+          liveBusCount += 1;
         }
+      }
 
-        const routeData = doc.data();
-        const intermediateStops = stopsSnapshot.size;
+      const routeData = doc.data();
+      const intermediateStops = stopsSnapshot.size;
 
-        return {
-          routeId,
-          organizationId: orgId,
-          ...routeData,
-          stopsCount: totalStationCount(intermediateStops, {
-            hasFrom: !!routeData.fromLocation,
-            hasTo: !!routeData.toLocation,
-          }),
-          intermediateStopsCount: intermediateStops,
-          activeBusCount: activeTrips.length,
-          liveBusCount,
-        };
-      })
+      return withBusinessId(businessId, {
+        routeId,
+        ...routeData,
+        stopsCount: totalStationCount(intermediateStops, {
+          hasFrom: !!routeData.fromLocation,
+          hasTo: !!routeData.toLocation,
+        }),
+        intermediateStopsCount: intermediateStops,
+        activeBusCount: activeTrips.length,
+        liveBusCount,
+      });
+    })
+  );
+}
+
+router.get("/", optionalAdminWithPermission("routes:read"), async (req, res) => {
+  try {
+    const businessId = resolveBusinessId(req, req.adminAuth);
+    const businessIds = await listAccessibleBusinessIds(
+      db,
+      req.adminAuth,
+      businessId
     );
-
+    const routes = await mapAcrossBusinesses(db, businessIds, listRoutesForBusiness);
     ok(res, routes);
   } catch (error) {
-    fail(res, (error as Error).message, 500);
+    const err = error as Error & { status?: number };
+    fail(res, err.message, err.status ?? 500);
   }
 });
 
 router.get("/:routeId/live", async (req, res) => {
   try {
-    const orgId = getOrgId(req);
-    const { routeId } = req.params;
+    const businessId = requireBusinessId(req, req.adminAuth);
+    const routeId = paramId(req.params.routeId);
 
-    const routeRef = db
-      .collection(COLLECTIONS.organizations)
-      .doc(orgId)
+    const routeRef = businessRef(db, businessId)
       .collection(COLLECTIONS.routes)
       .doc(routeId);
 
@@ -98,9 +110,7 @@ router.get("/:routeId/live", async (req, res) => {
 
     const [stopsSnapshot, tripsSnapshot] = await Promise.all([
       routeRef.collection(COLLECTIONS.stops).orderBy("sequenceNo").get(),
-      db
-        .collection(COLLECTIONS.organizations)
-        .doc(orgId)
+      businessRef(db, businessId)
         .collection(COLLECTIONS.trips)
         .where("routeId", "==", routeId)
         .where("tripStatus", "==", "active")
@@ -118,9 +128,7 @@ router.get("/:routeId/live", async (req, res) => {
 
     for (const tripDoc of tripsSnapshot.docs) {
       const trip = tripDoc.data();
-      const busDoc = await db
-        .collection(COLLECTIONS.organizations)
-        .doc(orgId)
+      const busDoc = await businessRef(db, businessId)
         .collection(COLLECTIONS.buses)
         .doc(trip.busId as string)
         .get();
@@ -132,9 +140,7 @@ router.get("/:routeId/live", async (req, res) => {
       if (isLive) liveBusCount += 1;
 
       buses.push({
-        busId: busDoc.id,
-        organizationId: orgId,
-        ...busData,
+        ...withBusinessId(businessId, { busId: busDoc.id, ...busData }),
         tripId: tripDoc.id,
         lastArrivedAt:
           (trip.lastArrivedAt as string | undefined) ??
@@ -149,34 +155,32 @@ router.get("/:routeId/live", async (req, res) => {
     }
 
     ok(res, {
-      route: {
+      route: withBusinessId(businessId, {
         routeId,
-        organizationId: orgId,
         ...routeDoc.data(),
         stopsCount: totalStationCount(stops.length, {
           hasFrom: !!routeDoc.data()?.fromLocation,
           hasTo: !!routeDoc.data()?.toLocation,
         }),
         intermediateStopsCount: stops.length,
-      },
+      }),
       stops,
       buses,
       liveBusCount,
       activeBusCount: tripsSnapshot.size,
     });
   } catch (error) {
-    fail(res, (error as Error).message, 500);
+    const err = error as Error & { status?: number };
+    fail(res, err.message, err.status ?? 500);
   }
 });
 
-router.get("/:routeId", async (req, res) => {
+router.get("/:routeId", optionalAdminWithPermission("routes:read"), async (req, res) => {
   try {
-    const orgId = getOrgId(req);
-    const { routeId } = req.params;
+    const businessId = requireBusinessId(req, req.adminAuth);
+    const routeId = paramId(req.params.routeId);
 
-    const routeRef = db
-      .collection(COLLECTIONS.organizations)
-      .doc(orgId)
+    const routeRef = businessRef(db, businessId)
       .collection(COLLECTIONS.routes)
       .doc(routeId);
 
@@ -186,7 +190,10 @@ router.get("/:routeId", async (req, res) => {
       return;
     }
 
-    const stopsSnapshot = await routeRef.collection(COLLECTIONS.stops).orderBy("sequenceNo").get();
+    const stopsSnapshot = await routeRef
+      .collection(COLLECTIONS.stops)
+      .orderBy("sequenceNo")
+      .get();
     const stops = stopsSnapshot.docs.map((doc) => ({
       stopId: doc.id,
       routeId,
@@ -197,26 +204,26 @@ router.get("/:routeId", async (req, res) => {
     const intermediateStops = stopsSnapshot.size;
 
     ok(res, {
-      route: {
+      route: withBusinessId(businessId, {
         routeId,
-        organizationId: orgId,
         ...routeData,
         stopsCount: totalStationCount(intermediateStops, {
           hasFrom: !!routeData.fromLocation,
           hasTo: !!routeData.toLocation,
         }),
         intermediateStopsCount: intermediateStops,
-      },
+      }),
       stops,
     });
   } catch (error) {
-    fail(res, (error as Error).message, 500);
+    const err = error as Error & { status?: number };
+    fail(res, err.message, err.status ?? 500);
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", optionalAdminWithPermission("routes:write"), async (req, res) => {
   try {
-    const orgId = getOrgId(req);
+    const businessId = requireBusinessId(req, req.adminAuth);
     const {
       name,
       code,
@@ -253,9 +260,7 @@ router.post("/", async (req, res) => {
     }
 
     const now = new Date().toISOString();
-    const docRef = await db
-      .collection(COLLECTIONS.organizations)
-      .doc(orgId)
+    const docRef = await businessRef(db, businessId)
       .collection(COLLECTIONS.routes)
       .add({
         name,
@@ -296,9 +301,8 @@ router.post("/", async (req, res) => {
 
     ok(
       res,
-      {
+      withBusinessId(businessId, {
         routeId: docRef.id,
-        organizationId: orgId,
         name,
         code,
         colorHex: colorHex || "#FF6B00",
@@ -306,50 +310,50 @@ router.post("/", async (req, res) => {
         accessMode: accessMode === "private" ? "private" : "public",
         fromLocation,
         toLocation,
-      },
+      }),
       201
     );
   } catch (error) {
-    fail(res, (error as Error).message, 500);
+    const err = error as Error & { status?: number };
+    fail(res, err.message, err.status ?? 500);
   }
 });
 
-router.put("/:routeId", async (req, res) => {
+router.put("/:routeId", optionalAdminWithPermission("routes:write"), async (req, res) => {
   try {
-    const orgId = getOrgId(req);
-    const { routeId } = req.params;
+    const businessId = requireBusinessId(req, req.adminAuth);
+    const routeId = paramId(req.params.routeId);
     const updates = { ...req.body, updatedAt: new Date().toISOString() };
     delete updates.organizationId;
+    delete updates.businessId;
     delete updates.routeId;
 
-    await db
-      .collection(COLLECTIONS.organizations)
-      .doc(orgId)
+    await businessRef(db, businessId)
       .collection(COLLECTIONS.routes)
       .doc(routeId)
       .update(updates);
 
-    ok(res, { routeId, ...updates });
+    ok(res, withBusinessId(businessId, { routeId, ...updates }));
   } catch (error) {
-    fail(res, (error as Error).message, 500);
+    const err = error as Error & { status?: number };
+    fail(res, err.message, err.status ?? 500);
   }
 });
 
-router.delete("/:routeId", async (req, res) => {
+router.delete("/:routeId", optionalAdminWithPermission("routes:write"), async (req, res) => {
   try {
-    const orgId = getOrgId(req);
-    const { routeId } = req.params;
+    const businessId = requireBusinessId(req, req.adminAuth);
+    const routeId = paramId(req.params.routeId);
 
-    await db
-      .collection(COLLECTIONS.organizations)
-      .doc(orgId)
+    await businessRef(db, businessId)
       .collection(COLLECTIONS.routes)
       .doc(routeId)
       .delete();
 
     ok(res, { routeId, deleted: true });
   } catch (error) {
-    fail(res, (error as Error).message, 500);
+    const err = error as Error & { status?: number };
+    fail(res, err.message, err.status ?? 500);
   }
 });
 

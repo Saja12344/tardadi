@@ -2,40 +2,50 @@ import { Router } from "express";
 import type { Query } from "firebase-admin/firestore";
 import { COLLECTIONS } from "@tardadi/shared";
 import { db } from "../firebase";
+import { optionalAdminWithPermission } from "../auth/middleware";
+import { resolveBusinessId, requireBusinessId, withBusinessId } from "../auth/scope";
+import {
+  listAccessibleBusinessIds,
+  mapAcrossBusinesses,
+} from "../business/access";
+import { businessRef } from "../business/helpers";
 import { fail, getOrgId, ok } from "../utils";
 
 const router = Router();
 
-router.get("/", async (req, res) => {
+async function listTripsForBusiness(businessId: string, status?: string) {
+  let query: Query = businessRef(db, businessId).collection(COLLECTIONS.trips);
+  if (status) {
+    query = query.where("tripStatus", "==", status);
+  }
+  const snapshot = await query.orderBy("updatedAt", "desc").get();
+  return snapshot.docs.map((doc) =>
+    withBusinessId(businessId, { tripId: doc.id, ...doc.data() })
+  );
+}
+
+router.get("/", optionalAdminWithPermission("trips:read"), async (req, res) => {
   try {
-    const orgId = getOrgId(req);
+    const businessId = resolveBusinessId(req, req.adminAuth);
     const status = req.query.status as string | undefined;
-
-    let query: Query = db
-      .collection(COLLECTIONS.organizations)
-      .doc(orgId)
-      .collection(COLLECTIONS.trips);
-
-    if (status) {
-      query = query.where("tripStatus", "==", status);
-    }
-
-    const snapshot = await query.orderBy("updatedAt", "desc").get();
-    const trips = snapshot.docs.map((doc) => ({
-      tripId: doc.id,
-      organizationId: orgId,
-      ...doc.data(),
-    }));
-
+    const businessIds = await listAccessibleBusinessIds(
+      db,
+      req.adminAuth,
+      businessId
+    );
+    const trips = await mapAcrossBusinesses(db, businessIds, (id) =>
+      listTripsForBusiness(id, status)
+    );
     ok(res, trips);
   } catch (error) {
-    fail(res, (error as Error).message, 500);
+    const err = error as Error & { status?: number };
+    fail(res, err.message, err.status ?? 500);
   }
 });
 
 router.post("/start", async (req, res) => {
   try {
-    const orgId = getOrgId(req);
+    const businessId = getOrgId(req);
     const { driverId, busId, routeId } = req.body;
 
     if (!driverId || !busId || !routeId) {
@@ -43,9 +53,7 @@ router.post("/start", async (req, res) => {
       return;
     }
 
-    const activeTrips = await db
-      .collection(COLLECTIONS.organizations)
-      .doc(orgId)
+    const activeTrips = await businessRef(db, businessId)
       .collection(COLLECTIONS.trips)
       .where("busId", "==", busId)
       .where("tripStatus", "==", "active")
@@ -58,9 +66,7 @@ router.post("/start", async (req, res) => {
     }
 
     const now = new Date().toISOString();
-    const tripRef = await db
-      .collection(COLLECTIONS.organizations)
-      .doc(orgId)
+    const tripRef = await businessRef(db, businessId)
       .collection(COLLECTIONS.trips)
       .add({
         busId,
@@ -73,9 +79,7 @@ router.post("/start", async (req, res) => {
         updatedAt: now,
       });
 
-    await db
-      .collection(COLLECTIONS.organizations)
-      .doc(orgId)
+    await businessRef(db, businessId)
       .collection(COLLECTIONS.buses)
       .doc(busId)
       .update({
@@ -83,15 +87,18 @@ router.post("/start", async (req, res) => {
         updatedAt: now,
       });
 
-    ok(res, {
-      tripId: tripRef.id,
-      organizationId: orgId,
-      busId,
-      driverId,
-      routeId,
-      tripStatus: "active",
-      startedAt: now,
-    }, 201);
+    ok(
+      res,
+      withBusinessId(businessId, {
+        tripId: tripRef.id,
+        busId,
+        driverId,
+        routeId,
+        tripStatus: "active",
+        startedAt: now,
+      }),
+      201
+    );
   } catch (error) {
     fail(res, (error as Error).message, 500);
   }
@@ -99,7 +106,7 @@ router.post("/start", async (req, res) => {
 
 router.post("/arrived", async (req, res) => {
   try {
-    const orgId = getOrgId(req);
+    const businessId = getOrgId(req);
     const { tripId, driverId, stopId } = req.body;
 
     if (!tripId || !driverId) {
@@ -107,9 +114,7 @@ router.post("/arrived", async (req, res) => {
       return;
     }
 
-    const tripRef = db
-      .collection(COLLECTIONS.organizations)
-      .doc(orgId)
+    const tripRef = businessRef(db, businessId)
       .collection(COLLECTIONS.trips)
       .doc(tripId);
 
@@ -139,9 +144,7 @@ router.post("/arrived", async (req, res) => {
 
     await tripRef.update(arrival);
 
-    await db
-      .collection(COLLECTIONS.organizations)
-      .doc(orgId)
+    await businessRef(db, businessId)
       .collection(COLLECTIONS.buses)
       .doc(trip.busId as string)
       .update(arrival);
@@ -154,7 +157,7 @@ router.post("/arrived", async (req, res) => {
 
 router.post("/end", async (req, res) => {
   try {
-    const orgId = getOrgId(req);
+    const businessId = getOrgId(req);
     const { tripId, driverId } = req.body;
 
     if (!tripId || !driverId) {
@@ -162,9 +165,7 @@ router.post("/end", async (req, res) => {
       return;
     }
 
-    const tripRef = db
-      .collection(COLLECTIONS.organizations)
-      .doc(orgId)
+    const tripRef = businessRef(db, businessId)
       .collection(COLLECTIONS.trips)
       .doc(tripId);
 
@@ -187,11 +188,9 @@ router.post("/end", async (req, res) => {
       updatedAt: now,
     });
 
-    await db
-      .collection(COLLECTIONS.organizations)
-      .doc(orgId)
+    await businessRef(db, businessId)
       .collection(COLLECTIONS.buses)
-      .doc(tripData.busId)
+      .doc(tripData.busId as string)
       .update({
         currentTripId: null,
         updatedAt: now,

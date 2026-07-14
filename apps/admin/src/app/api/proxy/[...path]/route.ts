@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  getBusinessContextId,
+  getSession,
+  resolveActiveBusinessId,
+} from "@/lib/auth.server";
+import {
   getServerApiUrl,
-  getServerOrgId,
   isAllowedProxyPath,
 } from "@/lib/env.server";
 
@@ -18,29 +22,36 @@ async function proxyRequest(
     );
   }
 
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json(
+      { success: false, error: "يجب تسجيل الدخول." },
+      { status: 401 }
+    );
+  }
+
   const apiUrl = getServerApiUrl();
-  const orgId = getServerOrgId();
+  const businessId = await resolveActiveBusinessId(session);
   const pathname = pathSegments.join("/");
   const targetUrl = new URL(`${apiUrl}/${pathname}`);
 
   request.nextUrl.searchParams.forEach((value, key) => {
-    if (key !== "organizationId") {
+    if (key !== "organizationId" && key !== "businessId") {
       targetUrl.searchParams.set(key, value);
     }
   });
-  targetUrl.searchParams.set("organizationId", orgId);
+
+  if (businessId) {
+    targetUrl.searchParams.set("businessId", businessId);
+    targetUrl.searchParams.set("organizationId", businessId);
+  }
 
   const headers = new Headers();
   const contentType = request.headers.get("content-type");
   if (contentType) {
     headers.set("Content-Type", contentType);
   }
-
-  // Future: attach admin session token here — never expose it to the browser.
-  const adminToken = process.env.ADMIN_API_TOKEN;
-  if (adminToken) {
-    headers.set("Authorization", `Bearer ${adminToken}`);
-  }
+  headers.set("Authorization", `Bearer ${session.token}`);
 
   const init: RequestInit = {
     method: request.method,
@@ -49,7 +60,18 @@ async function proxyRequest(
   };
 
   if (MUTATION_METHODS.has(request.method)) {
-    init.body = await request.text();
+    let bodyText = await request.text();
+    if (bodyText && businessId) {
+      try {
+        const parsed = JSON.parse(bodyText) as Record<string, unknown>;
+        parsed.businessId = businessId;
+        parsed.organizationId = businessId;
+        bodyText = JSON.stringify(parsed);
+      } catch {
+        // keep original body
+      }
+    }
+    init.body = bodyText;
   }
 
   let upstream: Response;

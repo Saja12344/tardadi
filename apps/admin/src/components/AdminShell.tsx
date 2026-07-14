@@ -2,16 +2,36 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "./AuthProvider";
+import BusinessSwitcher from "./BusinessSwitcher";
+import { isSuperAdmin } from "@/lib/auth.constants";
 
-type NavIcon = "home" | "routes" | "buses" | "drivers" | "trips";
+type NavIcon =
+  | "home"
+  | "businesses"
+  | "routes"
+  | "buses"
+  | "drivers"
+  | "trips";
 
-const navItems = [
-  { href: "/", label: "الرئيسية", icon: "home" },
-  { href: "/routes", label: "الخطوط", icon: "routes" },
-  { href: "/buses", label: "الباصات", icon: "buses" },
-  { href: "/drivers", label: "السائقين", icon: "drivers" },
-  { href: "/trips", label: "الرحلات", icon: "trips" },
-] satisfies Array<{ href: string; label: string; icon: NavIcon }>;
+const allNavItems = [
+  { href: "/", label: "الرئيسية", icon: "home" as const, superOnly: false },
+  {
+    href: "/businesses",
+    label: "الشركات",
+    icon: "businesses" as const,
+    superOnly: true,
+  },
+  { href: "/routes", label: "الخطوط", icon: "routes" as const, superOnly: false },
+  { href: "/buses", label: "الباصات", icon: "buses" as const, superOnly: false },
+  {
+    href: "/drivers",
+    label: "السائقين",
+    icon: "drivers" as const,
+    superOnly: false,
+  },
+  { href: "/trips", label: "الرحلات", icon: "trips" as const, superOnly: false },
+];
 
 function NavIconGlyph({ icon }: { icon: NavIcon }) {
   const common = {
@@ -31,6 +51,17 @@ function NavIconGlyph({ icon }: { icon: NavIcon }) {
         <path d="M4 11.5 12 5l8 6.5" />
         <path d="M6.5 10.5V20h11v-9.5" />
         <path d="M10 20v-5h4v5" />
+      </svg>
+    );
+  }
+
+  if (icon === "businesses") {
+    return (
+      <svg {...common}>
+        <path d="M3 21h18" />
+        <path d="M6 21V7l6-4 6 4v14" />
+        <path d="M10 11h4" />
+        <path d="M10 15h4" />
       </svg>
     );
   }
@@ -80,9 +111,13 @@ function NavIconGlyph({ icon }: { icon: NavIcon }) {
   );
 }
 
-
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { user, logout, loading } = useAuth();
+
+  const navItems = allNavItems.filter(
+    (item) => !item.superOnly || isSuperAdmin(user)
+  );
 
   return (
     <div className="admin-layout">
@@ -95,12 +130,23 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           />
           <div className="brand-copy">
             <small>لوحة الإدارة</small>
+            {!loading && user && (
+              <small className="user-badge">
+                {user.name} ·{" "}
+                {user.role === "super_admin" ? "مدير النظام" : "مدير شركة"}
+              </small>
+            )}
           </div>
         </div>
 
+        <BusinessSwitcher />
+
         <nav className="sidebar-nav">
           {navItems.map((item) => {
-            const active = pathname === item.href;
+            const active =
+              item.href === "/"
+                ? pathname === "/"
+                : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}
@@ -115,7 +161,9 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         </nav>
 
         <div className="sidebar-footer">
-          <p>السائق يسجّل دخوله برقم الجوال فقط</p>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => logout()}>
+            تسجيل الخروج
+          </button>
         </div>
       </aside>
 
