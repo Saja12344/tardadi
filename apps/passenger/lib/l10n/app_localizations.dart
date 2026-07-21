@@ -40,21 +40,28 @@ class AppLocalizations {
   String get ar => 'Ar';
 
   String get onboardingTagline =>
-      isArabic ? 'وصل بدون تخمين' : 'GET THERE WITH LESS GUESSWORK';
+      isArabic ? 'وصل بدون تخمين' : 'Get there with less guesswork';
 
   String get onboardingTitle1 =>
-      isArabic ? 'خطط رحلتك بسهولة' : 'Plan your trip with ease';
+      isArabic ? 'لا تفوّت باصك' : 'Never miss your bus';
 
   String get onboardingSubtitle1 => isArabic
-      ? 'محطات قريبة منك على الخريطة. بدون تخمين ولا انتظار.'
-      : 'Stops near you shown on the map. No guessing, no waiting, just go.';
+      ? 'اعثر على المحطات والمسارات القريبة في ثوانٍ.'
+      : 'Find nearby stations and routes in seconds.';
 
   String get onboardingTitle2 =>
-      isArabic ? 'شوف المحطات حولك' : 'See stops around you';
+      isArabic ? 'تابع رحلتك مباشرة' : 'Track Your Ride Live';
 
   String get onboardingSubtitle2 => isArabic
-      ? 'فعّل الموقع والإشعارات مرة واحدة لتصلك تنبيهات الباص وتظهر المحطات القريبة.'
-      : 'Allow location and notifications once to get bus alerts and nearby stops.';
+      ? 'اعرف بالضبط أين الباص ومتى سيصل.'
+      : 'Know exactly where your bus is and when it will arrive.';
+
+  String get onboardingTitle3 =>
+      isArabic ? 'تنقّل بذكاء كل يوم' : 'Travel Smarter Every Day';
+
+  String get onboardingSubtitle3 => isArabic
+      ? 'احفظ مساراتك المفضلة، واستقبل التنبيهات، واستمتع بتنقل خالٍ من التوتر.'
+      : 'Save favorite routes, receive notifications, and enjoy stress-free commuting.';
 
   String get allowLocation =>
       isArabic ? 'متابعة' : 'Continue';

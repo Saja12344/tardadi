@@ -32,6 +32,7 @@ flutter:
   assets:
     - assets/images/logo_icon.png
     - assets/images/logo_full.png
+    - assets/images/logo_text.png
     - assets/images/onboarding_map.png
     - assets/videos/tardadi-icon-alpha.mov
     - assets/videos/tardadi-icon.mp4

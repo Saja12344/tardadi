@@ -6,7 +6,6 @@ import '../services/user_session.dart';
 import '../widgets/onboarding/onboarding_scale.dart';
 import '../widgets/onboarding/onboarding_theme.dart';
 import '../widgets/onboarding/verification_header.dart';
-import 'account_type_screen.dart';
 import 'verify_phone_screen.dart';
 
 class EnterPhoneScreen extends StatefulWidget {
@@ -33,14 +32,7 @@ class _EnterPhoneScreenState extends State<EnterPhoneScreen> {
   }
 
   void _goBack() {
-    if (widget.fromSettings) {
-      Navigator.of(context).pop();
-      return;
-    }
-
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const AccountTypeScreen()),
-    );
+    Navigator.of(context).pop();
   }
 
   void _continue() {

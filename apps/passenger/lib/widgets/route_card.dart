@@ -6,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'onboarding/onboarding_scale.dart';
 import 'onboarding/onboarding_theme.dart';
-import 'tardadi_brand_video.dart';
 
 class RouteCard extends StatelessWidget {
   const RouteCard({
@@ -380,21 +379,31 @@ class AccountTypeOption extends StatelessWidget {
 }
 
 class LogoWatermark extends StatelessWidget {
-  const LogoWatermark({super.key});
+  const LogoWatermark({
+    super.key,
+    this.opacity = 0.08,
+    this.alignment = const Alignment(0, 0.42),
+  });
+
+  final double opacity;
+  final Alignment alignment;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final side = math.max(constraints.maxWidth, constraints.maxHeight) * 1.2;
+        final side = math.min(constraints.maxWidth, constraints.maxHeight) * 1.45;
 
         return IgnorePointer(
-          child: SizedBox.expand(
-            child: Center(
-              child: TardadiBrandVideo(
-                size: side,
-                opacity: 0.06,
-                loop: true,
+          child: Align(
+            alignment: alignment,
+            child: Opacity(
+              opacity: opacity,
+              child: Image.asset(
+                'assets/images/logo_icon.png',
+                width: side,
+                height: side,
+                fit: BoxFit.contain,
               ),
             ),
           ),

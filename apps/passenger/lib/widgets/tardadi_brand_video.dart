@@ -151,13 +151,25 @@ class _TardadiBrandVideoState extends State<TardadiBrandVideo> {
 }
 
 class TardadiLoading extends StatelessWidget {
-  const TardadiLoading({super.key, this.size = 72});
+  const TardadiLoading({super.key, this.size = 56});
 
   final double size;
 
   @override
   Widget build(BuildContext context) {
-    return TardadiBrandVideo(size: size, loop: true);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: size,
+          height: size,
+          child: const CircularProgressIndicator(
+            strokeWidth: 2.5,
+            color: Color(0xFFF25C2A),
+          ),
+        ),
+      ],
+    );
   }
 }
 

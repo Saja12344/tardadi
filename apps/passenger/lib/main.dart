@@ -46,7 +46,7 @@ class _TardadiPassengerAppState extends State<TardadiPassengerApp> {
     final localizations = AppLocalizations(session.language);
 
     return MaterialApp(
-      title: 'ترددي',
+      title: 'Tardadi',
       theme: TardadiBrand.darkTheme(),
       scaffoldMessengerKey: rootScaffoldMessengerKey,
       locale: localizations.locale,

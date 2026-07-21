@@ -4,27 +4,17 @@ import 'package:flutter/material.dart';
 
 import 'onboarding_theme.dart';
 
-class _NearbyStop {
-  const _NearbyStop({
-    required this.label,
-    required this.point,
-    required this.phase,
-  });
-
-  final String label;
-  final Offset point;
-  final double phase;
-}
-
 class LocationIllustration extends StatefulWidget {
   const LocationIllustration({
     super.key,
     required this.width,
     required this.height,
+    this.isActive = true,
   });
 
   final double width;
   final double height;
+  final bool isActive;
 
   @override
   State<LocationIllustration> createState() => _LocationIllustrationState();
@@ -34,10 +24,12 @@ class _LocationIllustrationState extends State<LocationIllustration>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
-  static const _stops = [
-    _NearbyStop(label: '1', point: Offset(0.22, 0.30), phase: 0.0),
-    _NearbyStop(label: '2', point: Offset(0.72, 0.24), phase: 0.25),
-    _NearbyStop(label: '3', point: Offset(0.68, 0.72), phase: 0.5),
+  static const _route = [
+    Offset(0.14, 0.72),
+    Offset(0.28, 0.58),
+    Offset(0.46, 0.48),
+    Offset(0.64, 0.38),
+    Offset(0.82, 0.28),
   ];
 
   @override
@@ -45,8 +37,17 @@ class _LocationIllustrationState extends State<LocationIllustration>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3200),
-    )..repeat();
+      duration: const Duration(milliseconds: 4500),
+    );
+    if (widget.isActive) _controller.forward();
+  }
+
+  @override
+  void didUpdateWidget(LocationIllustration oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !oldWidget.isActive) {
+      _controller.forward(from: 0);
+    }
   }
 
   @override
@@ -55,200 +56,267 @@ class _LocationIllustrationState extends State<LocationIllustration>
     super.dispose();
   }
 
+  int _etaMinutes(double progress) {
+    final countdown = (1 - ((progress - 0.35) / 0.45).clamp(0.0, 1.0)) * 5;
+    return countdown.ceil().clamp(1, 5);
+  }
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: widget.width,
       height: widget.height,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) {
-            return CustomPaint(
-              painter: _LocationIllustrationPainter(
-                progress: _controller.value,
-                stops: _stops,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          final progress = Curves.easeInOut.transform(_controller.value);
+          final routeDraw = (progress / 0.32).clamp(0.0, 1.0);
+          final busProgress = ((progress - 0.28) / 0.52).clamp(0.0, 1.0);
+          final etaVisible = progress > 0.38;
+          final etaMinutes = _etaMinutes(progress);
+
+          return Stack(
+            clipBehavior: Clip.hardEdge,
+            children: [
+              CustomPaint(
+                size: Size(widget.width, widget.height),
+                painter: _LiveTrackingPainter(
+                  progress: progress,
+                  routeDraw: routeDraw,
+                  busProgress: busProgress,
+                  route: _route,
+                ),
+                child: const SizedBox.expand(),
               ),
-              child: const SizedBox.expand(),
-            );
-          },
+              if (etaVisible)
+                Positioned(
+                  right: widget.width * 0.08,
+                  top: widget.height * 0.1,
+                  child: _EtaBadge(minutes: etaMinutes, visible: etaVisible),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _EtaBadge extends StatelessWidget {
+  const _EtaBadge({required this.minutes, required this.visible});
+
+  final int minutes;
+  final bool visible;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedOpacity(
+      opacity: visible ? 1 : 0,
+      duration: OnboardingTheme.motionFast,
+      child: AnimatedScale(
+        scale: visible ? 1 : 0.92,
+        duration: OnboardingTheme.motionMedium,
+        curve: OnboardingTheme.motionCurve,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: OnboardingTheme.background.withValues(alpha: 0.88),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: OnboardingTheme.orange.withValues(alpha: 0.35),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: OnboardingTheme.orange.withValues(alpha: 0.2),
+                blurRadius: 16,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$minutes',
+                style: const TextStyle(
+                  color: OnboardingTheme.orange,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                ),
+              ),
+              const SizedBox(height: 2),
+              const Text(
+                'min',
+                style: TextStyle(
+                  color: OnboardingTheme.muted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _LocationIllustrationPainter extends CustomPainter {
-  const _LocationIllustrationPainter({
+class _LiveTrackingPainter extends CustomPainter {
+  const _LiveTrackingPainter({
     required this.progress,
-    required this.stops,
+    required this.routeDraw,
+    required this.busProgress,
+    required this.route,
   });
 
   final double progress;
-  final List<_NearbyStop> stops;
+  final double routeDraw;
+  final double busProgress;
+  final List<Offset> route;
 
-  static const _blockColor = Color(0xFFC8CDD8);
-  static const _streetColor = Color(0xFFF2F4F8);
-  static const _userCenter = Offset(0.46, 0.50);
+  static const _blockColor = Color(0xFF1E2A5A);
+  static const _streetColor = Color(0xFF263366);
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.drawRect(
       Offset.zero & size,
-      Paint()..color = OnboardingTheme.background,
+      Paint()..color = OnboardingTheme.card,
     );
 
-    _drawBlocks(canvas, size);
-    _drawStreets(canvas, size);
+    _drawAmbientGlow(canvas, size);
+    _drawCity(canvas, size);
+    _drawRoute(canvas, size);
+    _drawLivePulse(canvas, size);
 
-    final userCenter = Offset(
-      _userCenter.dx * size.width,
-      _userCenter.dy * size.height,
-    );
+    final points = route.map((p) => Offset(p.dx * size.width, p.dy * size.height)).toList();
+    final busPoint = _pointOnPolyline(points, busProgress);
 
-    _drawNearbyRadius(canvas, userCenter, size, progress);
-
-    for (final stop in stops) {
-      final center = Offset(
-        stop.point.dx * size.width,
-        stop.point.dy * size.height,
-      );
-      final reveal = _stopReveal(progress, stop.phase);
-      if (reveal <= 0) continue;
-
-      _drawWalkLine(
-        canvas,
-        userCenter,
-        center,
-        reveal,
-      );
-      _drawStopMarker(canvas, center, stop.label, size, progress, stop.phase);
+    if (busProgress > 0) {
+      _drawBus(canvas, busPoint, size, _segmentAngleAt(points, busProgress));
     }
 
-    _drawUserLocation(canvas, userCenter, size, progress);
+    _drawDestinationStop(canvas, points.last, size);
   }
 
-  double _stopReveal(double t, double phase) {
-    final start = phase * 0.55;
-    final end = start + 0.35;
-    if (t < start) return 0;
-    if (t > end) return 1;
-    return Curves.easeOut.transform((t - start) / (end - start));
+  void _drawAmbientGlow(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          OnboardingTheme.orange.withValues(alpha: 0.1),
+          Colors.transparent,
+        ],
+      ).createShader(
+        Rect.fromCircle(
+          center: Offset(size.width * 0.72, size.height * 0.28),
+          radius: size.width * 0.45,
+        ),
+      );
+    canvas.drawRect(Offset.zero & size, paint);
   }
 
-  void _drawBlocks(Canvas canvas, Size size) {
-    final paint = Paint()..color = _blockColor;
+  void _drawCity(Canvas canvas, Size size) {
+    final blockPaint = Paint()..color = _blockColor;
+    final streetPaint = Paint()..color = _streetColor;
+
     final blocks = [
-      Rect.fromLTWH(size.width * 0.04, size.height * 0.05, size.width * 0.20, size.height * 0.16),
-      Rect.fromLTWH(size.width * 0.34, size.height * 0.05, size.width * 0.22, size.height * 0.14),
-      Rect.fromLTWH(size.width * 0.66, size.height * 0.05, size.width * 0.28, size.height * 0.18),
-      Rect.fromLTWH(size.width * 0.04, size.height * 0.30, size.width * 0.18, size.height * 0.20),
-      Rect.fromLTWH(size.width * 0.58, size.height * 0.28, size.width * 0.16, size.height * 0.18),
-      Rect.fromLTWH(size.width * 0.78, size.height * 0.30, size.width * 0.18, size.height * 0.16),
-      Rect.fromLTWH(size.width * 0.04, size.height * 0.58, size.width * 0.18, size.height * 0.16),
-      Rect.fromLTWH(size.width * 0.58, size.height * 0.56, size.width * 0.16, size.height * 0.18),
-      Rect.fromLTWH(size.width * 0.78, size.height * 0.54, size.width * 0.18, size.height * 0.20),
-      Rect.fromLTWH(size.width * 0.04, size.height * 0.82, size.width * 0.36, size.height * 0.12),
-      Rect.fromLTWH(size.width * 0.58, size.height * 0.82, size.width * 0.36, size.height * 0.12),
+      Rect.fromLTWH(size.width * 0.05, size.height * 0.08, size.width * 0.22, size.height * 0.14),
+      Rect.fromLTWH(size.width * 0.34, size.height * 0.06, size.width * 0.24, size.height * 0.12),
+      Rect.fromLTWH(size.width * 0.66, size.height * 0.05, size.width * 0.28, size.height * 0.16),
+      Rect.fromLTWH(size.width * 0.05, size.height * 0.58, size.width * 0.2, size.height * 0.18),
+      Rect.fromLTWH(size.width * 0.68, size.height * 0.58, size.width * 0.24, size.height * 0.2),
     ];
 
     for (final block in blocks) {
       canvas.drawRRect(
-        RRect.fromRectAndRadius(block, const Radius.circular(6)),
-        paint,
+        RRect.fromRectAndRadius(block, const Radius.circular(7)),
+        blockPaint,
       );
     }
-  }
-
-  void _drawStreets(Canvas canvas, Size size) {
-    final paint = Paint()..color = _streetColor;
 
     final streets = [
-      Rect.fromLTWH(size.width * 0.24, size.height * 0.05, size.width * 0.08, size.height * 0.90),
-      Rect.fromLTWH(size.width * 0.50, size.height * 0.05, size.width * 0.06, size.height * 0.90),
-      Rect.fromLTWH(size.width * 0.72, size.height * 0.05, size.width * 0.04, size.height * 0.90),
-      Rect.fromLTWH(size.width * 0.04, size.height * 0.22, size.width * 0.92, size.height * 0.05),
-      Rect.fromLTWH(size.width * 0.04, size.height * 0.48, size.width * 0.92, size.height * 0.05),
-      Rect.fromLTWH(size.width * 0.04, size.height * 0.74, size.width * 0.92, size.height * 0.05),
+      Rect.fromLTWH(size.width * 0.28, size.height * 0.05, size.width * 0.05, size.height * 0.88),
+      Rect.fromLTWH(size.width * 0.58, size.height * 0.05, size.width * 0.04, size.height * 0.88),
+      Rect.fromLTWH(size.width * 0.05, size.height * 0.42, size.width * 0.9, size.height * 0.045),
+      Rect.fromLTWH(size.width * 0.05, size.height * 0.78, size.width * 0.9, size.height * 0.045),
     ];
 
     for (final street in streets) {
       canvas.drawRRect(
         RRect.fromRectAndRadius(street, const Radius.circular(4)),
-        paint,
+        streetPaint,
       );
     }
   }
 
-  void _drawNearbyRadius(
-    Canvas canvas,
-    Offset center,
-    Size size,
-    double t,
-  ) {
-    final pulse = (math.sin(t * math.pi * 2) + 1) / 2;
-    final radius = size.width * (0.24 + pulse * 0.04);
+  void _drawRoute(Canvas canvas, Size size) {
+    if (routeDraw <= 0) return;
 
-    canvas.drawCircle(
-      center,
-      radius,
+    final points = route.map((p) => Offset(p.dx * size.width, p.dy * size.height)).toList();
+    final path = _trimmedPolylinePath(points, routeDraw);
+
+    canvas.drawPath(
+      path,
       Paint()
-        ..color = OnboardingTheme.orange.withValues(alpha: 0.08 + pulse * 0.06)
-        ..style = PaintingStyle.fill,
-    );
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..color = OnboardingTheme.orange.withValues(alpha: 0.22)
+        ..color = OnboardingTheme.orange.withValues(alpha: 0.18)
+        ..strokeWidth = 6
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
-    );
-  }
-
-  void _drawWalkLine(
-    Canvas canvas,
-    Offset from,
-    Offset to,
-    double reveal,
-  ) {
-    final end = Offset.lerp(from, to, reveal)!;
-    canvas.drawLine(
-      from,
-      end,
-      Paint()
-        ..color = OnboardingTheme.orange.withValues(alpha: 0.35)
-        ..strokeWidth = 2
         ..strokeCap = StrokeCap.round,
     );
+
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = OnboardingTheme.orange
+        ..strokeWidth = 3
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round,
+    );
+
+    if (busProgress > 0) {
+      canvas.drawPath(
+        _trimmedPolylinePath(points, busProgress),
+        Paint()
+          ..color = OnboardingTheme.orange.withValues(alpha: 0.35)
+          ..strokeWidth = 8
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+      );
+    }
   }
 
-  void _drawStopMarker(
-    Canvas canvas,
-    Offset center,
-    String label,
-    Size size,
-    double t,
-    double phase,
-  ) {
-    final pulse = (t + phase) % 1.0;
-    final ringRadius = size.width * 0.048;
-    final pulseRadius = ringRadius * (1 + pulse * 0.7);
-    final pulseOpacity = (1 - pulse) * 0.35;
+  void _drawLivePulse(Canvas canvas, Size size) {
+    if (progress < 0.2) return;
+
+    final pulse = (math.sin(progress * math.pi * 3) + 1) / 2;
+    final center = Offset(size.width * 0.14, size.height * 0.72);
 
     canvas.drawCircle(
       center,
-      pulseRadius,
+      size.width * (0.06 + pulse * 0.015),
       Paint()
-        ..color = OnboardingTheme.orange.withValues(alpha: pulseOpacity)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
+        ..color = OnboardingTheme.orange.withValues(alpha: 0.12 + pulse * 0.08)
+        ..style = PaintingStyle.fill,
+    );
+  }
+
+  void _drawDestinationStop(Canvas canvas, Offset center, Size size) {
+    final pulse = progress > 0.7
+        ? 0.4 + math.sin(progress * math.pi * 5) * 0.12
+        : 0.0;
+
+    canvas.drawCircle(
+      center,
+      size.width * 0.07 * (1 + pulse),
+      Paint()
+        ..color = OnboardingTheme.orange.withValues(alpha: 0.15)
+        ..style = PaintingStyle.fill,
     );
 
     canvas.drawCircle(
       center,
-      ringRadius,
+      size.width * 0.042,
       Paint()
         ..color = OnboardingTheme.orange
         ..style = PaintingStyle.stroke
@@ -257,17 +325,40 @@ class _LocationIllustrationPainter extends CustomPainter {
 
     canvas.drawCircle(
       center,
-      ringRadius * 0.38,
+      size.width * 0.018,
       Paint()..color = Colors.white,
     );
+  }
 
+  void _drawBus(Canvas canvas, Offset center, Size size, double angle) {
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(angle + math.pi / 2);
+
+    final rect = Rect.fromCenter(
+      center: Offset.zero,
+      width: size.width * 0.11,
+      height: size.width * 0.11,
+    );
+
+    final rrect = RRect.fromRectAndRadius(rect, Radius.circular(size.width * 0.028));
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..color = OnboardingTheme.orange
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+    );
+    canvas.drawRRect(rrect, Paint()..color = OnboardingTheme.orange);
+
+    final icon = Icons.directions_bus_rounded;
     final textPainter = TextPainter(
       text: TextSpan(
-        text: label,
+        text: String.fromCharCode(icon.codePoint),
         style: TextStyle(
-          color: OnboardingTheme.orange,
-          fontSize: size.width * 0.048,
-          fontWeight: FontWeight.w800,
+          fontSize: size.width * 0.055,
+          fontFamily: icon.fontFamily,
+          package: icon.fontPackage,
+          color: Colors.white,
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -275,53 +366,100 @@ class _LocationIllustrationPainter extends CustomPainter {
 
     textPainter.paint(
       canvas,
-      center + Offset(ringRadius * 0.5, -textPainter.height * 0.85),
+      Offset(-textPainter.width / 2, -textPainter.height / 2),
     );
+
+    canvas.restore();
   }
 
-  void _drawUserLocation(
-    Canvas canvas,
-    Offset center,
-    Size size,
-    double t,
-  ) {
-    final pulse = (math.sin(t * math.pi * 2) + 1) / 2;
-    final outerRadius = size.width * 0.058 * (1 + pulse * 0.18);
+  Path _trimmedPolylinePath(List<Offset> points, double t) {
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    var total = 0.0;
+    final lengths = <double>[];
 
-    canvas.drawCircle(
-      center,
-      outerRadius,
-      Paint()
-        ..color = OnboardingTheme.orange.withValues(alpha: 0.18 + pulse * 0.12)
-        ..style = PaintingStyle.fill,
-    );
+    for (var i = 0; i < points.length - 1; i++) {
+      final len = (points[i + 1] - points[i]).distance;
+      lengths.add(len);
+      total += len;
+    }
 
-    canvas.drawCircle(
-      center,
-      size.width * 0.038,
-      Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.fill,
-    );
+    if (total == 0) return path;
 
-    canvas.drawCircle(
-      center,
-      size.width * 0.038,
-      Paint()
-        ..color = OnboardingTheme.orange
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3,
-    );
+    final target = total * t;
+    var walked = 0.0;
 
-    canvas.drawCircle(
-      center,
-      size.width * 0.016,
-      Paint()..color = OnboardingTheme.orange,
-    );
+    for (var i = 0; i < points.length - 1; i++) {
+      final len = lengths[i];
+      if (walked + len >= target) {
+        final local = ((target - walked) / len).clamp(0.0, 1.0);
+        final end = Offset.lerp(points[i], points[i + 1], local)!;
+        path.lineTo(end.dx, end.dy);
+        break;
+      }
+      path.lineTo(points[i + 1].dx, points[i + 1].dy);
+      walked += len;
+    }
+
+    return path;
   }
 
   @override
-  bool shouldRepaint(covariant _LocationIllustrationPainter oldDelegate) {
-    return oldDelegate.progress != progress;
+  bool shouldRepaint(covariant _LiveTrackingPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.routeDraw != routeDraw ||
+        oldDelegate.busProgress != busProgress;
   }
+}
+
+Offset _pointOnPolyline(List<Offset> points, double t) {
+  var total = 0.0;
+  final lengths = <double>[];
+
+  for (var i = 0; i < points.length - 1; i++) {
+    final len = (points[i + 1] - points[i]).distance;
+    lengths.add(len);
+    total += len;
+  }
+
+  if (total == 0) return points.first;
+
+  final target = t * total;
+  var walked = 0.0;
+
+  for (var i = 0; i < points.length - 1; i++) {
+    final len = lengths[i];
+    if (walked + len >= target) {
+      return Offset.lerp(points[i], points[i + 1], (target - walked) / len)!;
+    }
+    walked += len;
+  }
+
+  return points.last;
+}
+
+double _segmentAngleAt(List<Offset> points, double t) {
+  var total = 0.0;
+  final lengths = <double>[];
+
+  for (var i = 0; i < points.length - 1; i++) {
+    final len = (points[i + 1] - points[i]).distance;
+    lengths.add(len);
+    total += len;
+  }
+
+  if (total == 0) return 0;
+
+  final target = t * total;
+  var walked = 0.0;
+
+  for (var i = 0; i < points.length - 1; i++) {
+    final len = lengths[i];
+    if (walked + len >= target) {
+      final delta = points[i + 1] - points[i];
+      return math.atan2(delta.dy, delta.dx);
+    }
+    walked += len;
+  }
+
+  return 0;
 }

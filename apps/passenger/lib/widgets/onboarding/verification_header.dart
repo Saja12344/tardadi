@@ -20,20 +20,20 @@ class VerificationHeader extends StatelessWidget {
       decoration: BoxDecoration(
         color: OnboardingTheme.background,
         borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(scale.s(32)),
-          bottomRight: Radius.circular(scale.s(32)),
+          bottomLeft: Radius.circular(scale.s(28)),
+          bottomRight: Radius.circular(scale.s(28)),
         ),
       ),
       child: SafeArea(
         bottom: false,
         child: SizedBox(
-          height: scale.size.height * 0.34,
+          height: scale.verifyHeaderHeight,
           child: Padding(
             padding: EdgeInsets.fromLTRB(
               scale.s(12),
-              scale.s(8),
+              scale.s(6),
               scale.s(12),
-              scale.s(28),
+              scale.s(18),
             ),
             child: Column(
               children: [
@@ -56,7 +56,8 @@ class VerificationHeader extends StatelessWidget {
                   child: Center(
                     child: Image.asset(
                       'assets/images/logo_full.png',
-                      height: scale.s(92),
+                      height: scale.verifyHeaderLogoHeight,
+                      fit: BoxFit.contain,
                     ),
                   ),
                 ),

@@ -12,6 +12,7 @@ import '../widgets/left_back_button.dart';
 import '../widgets/onboarding/frosted_glass.dart';
 import '../widgets/onboarding/onboarding_theme.dart';
 import '../widgets/passenger_route_map.dart';
+import '../widgets/route_card.dart';
 import '../widgets/tardadi_brand_video.dart';
 import '../widgets/vehicle_icon.dart';
 
@@ -177,29 +178,37 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                   topRight: Radius.circular(24),
                 ),
               ),
-              child: _buses.isEmpty
-                  ? Center(
-                      child: Text(
-                        l10n.noLiveBuses,
-                        style: GoogleFonts.ubuntu(
-                          color: OnboardingTheme.muted,
-                          fontSize: 15,
+              child: Stack(
+                children: [
+                  const LogoWatermark(
+                    opacity: 0.07,
+                    alignment: Alignment(0, 0.15),
+                  ),
+                  _buses.isEmpty
+                      ? Center(
+                          child: Text(
+                            l10n.noLiveBuses,
+                            style: GoogleFonts.ubuntu(
+                              color: OnboardingTheme.muted,
+                              fontSize: 15,
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+                          itemCount: _buses.length,
+                          itemBuilder: (context, index) {
+                            final bus = _buses[index];
+                            return _BusArrivalCard(
+                              item: bus,
+                              notificationsEnabled:
+                                  _notifications.isEnabled(bus.id),
+                              onToggleNotifications: () => _toggleBell(bus),
+                            );
+                          },
                         ),
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
-                      itemCount: _buses.length,
-                      itemBuilder: (context, index) {
-                        final bus = _buses[index];
-                        return _BusArrivalCard(
-                          item: bus,
-                          notificationsEnabled:
-                              _notifications.isEnabled(bus.id),
-                          onToggleNotifications: () => _toggleBell(bus),
-                        );
-                      },
-                    ),
+                ],
+              ),
             ),
           ),
         ],

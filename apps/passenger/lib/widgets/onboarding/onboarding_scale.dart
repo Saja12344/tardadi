@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'onboarding_theme.dart';
+
 const _designWidth = 390.0;
 const _designHeight = 844.0;
 
@@ -23,25 +25,32 @@ class OnboardingScale {
 
   double s(double designPixels) => designPixels * factor;
 
-  double get logoIconSize => s(28);
+  double get logoIconSize => s(44);
+
+  double get featureCardHeight => s(250).clamp(240.0, 260.0);
+
+  double get illustrationWidth =>
+      (size.width - horizontalPadding * 2).clamp(280.0, 360.0);
+
+  double get illustrationHeight => featureCardHeight;
+
+  /// Narrower inset for title/description so lines break more naturally.
+  double get copyHorizontalInset =>
+      math.max(horizontalPadding - s(16), s(12));
 
   double get accountLogoSize => s(64);
 
   double get splashLogoSize => s(44);
 
-  double get illustrationWidth =>
-      (size.width - horizontalPadding * 2).clamp(280.0, 360.0);
+  double get onboardingTitleSize => s(OnboardingTheme.onboardingTitleSize);
 
-  double get illustrationHeight =>
-      math.min(illustrationWidth * 0.78, size.height * 0.38);
+  double get onboardingSubtitleSize => s(OnboardingTheme.onboardingSubtitleSize);
 
-  double get onboardingTitleSize => s(22);
+  double get onboardingTaglineSize => s(13);
 
-  double get onboardingSubtitleSize => s(14);
+  double get buttonHeight => s(OnboardingTheme.onboardingButtonHeight);
 
-  double get onboardingTaglineSize => s(11);
-
-  double get buttonVerticalPadding => s(16);
+  double get buttonRadius => s(OnboardingTheme.onboardingButtonRadius);
 
   double get buttonFontSize => s(17);
 
@@ -59,7 +68,10 @@ class OnboardingScale {
 
   double get accountSubtitleSize => s(14);
 
-  double get verifyHeaderLogoHeight => s(72);
+  double get verifyHeaderLogoHeight => s(52);
+
+  double get verifyHeaderHeight =>
+      (size.height * 0.22).clamp(s(148), s(176));
 
   double get verifyTitleSize => s(24);
 

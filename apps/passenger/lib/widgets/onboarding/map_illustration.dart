@@ -8,20 +8,19 @@ class _MapStop {
   const _MapStop({
     required this.label,
     required this.point,
-    required this.phase,
+    required this.trigger,
   });
 
   final String label;
   final Offset point;
-  final double phase;
+  final double trigger;
 }
 
-/// Uniform city-block grid: 4×4 blocks with even streets and intersections.
 class _MapGridLayout {
   _MapGridLayout(Size size)
-      : pad = size.width * 0.04,
-        streetWidth = size.width * 0.052,
-        streetHeight = size.height * 0.058,
+      : pad = size.width * 0.06,
+        streetWidth = size.width * 0.048,
+        streetHeight = size.height * 0.052,
         cols = 4,
         rows = 4 {
     final contentW = size.width - pad * 2;
@@ -47,7 +46,6 @@ class _MapGridLayout {
     );
   }
 
-  /// Center of the crossing between blocks `(col, row)` and `(col + 1, row + 1)`.
   Offset intersection(int col, int row) {
     return Offset(
       pad + (col + 1) * blockW + (col + 0.5) * streetWidth,
@@ -86,25 +84,11 @@ class _MapGridLayout {
     ];
   }
 
-  /// Route A → B → C along street centers (L-shaped path).
   List<Offset> routePoints() {
     final a = intersection(0, 0);
     final b = intersection(1, 1);
     final c = intersection(2, 2);
-    return [
-      a,
-      Offset(a.dx, b.dy),
-      b,
-      Offset(b.dx, c.dy),
-      c,
-    ];
-  }
-
-  List<Offset> routeFractions(Size size) {
-    return [
-      for (final point in routePoints())
-        Offset(point.dx / size.width, point.dy / size.height),
-    ];
+    return [a, Offset(a.dx, b.dy), b, Offset(b.dx, c.dy), c];
   }
 }
 
@@ -113,10 +97,12 @@ class MapIllustration extends StatefulWidget {
     super.key,
     required this.width,
     required this.height,
+    this.isActive = true,
   });
 
   final double width;
   final double height;
+  final bool isActive;
 
   @override
   State<MapIllustration> createState() => _MapIllustrationState();
@@ -131,8 +117,17 @@ class _MapIllustrationState extends State<MapIllustration>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2400),
-    )..repeat();
+      duration: const Duration(milliseconds: 4200),
+    );
+    if (widget.isActive) _controller.forward();
+  }
+
+  @override
+  void didUpdateWidget(MapIllustration oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !oldWidget.isActive) {
+      _controller.forward(from: 0);
+    }
   }
 
   @override
@@ -143,62 +138,85 @@ class _MapIllustrationState extends State<MapIllustration>
 
   List<_MapStop> _stopsFor(Size size) {
     final grid = _MapGridLayout(size);
-    final fractions = grid.routeFractions(size);
+    final points = grid.routePoints();
     return [
-      _MapStop(label: 'A', point: fractions[0], phase: 0.0),
-      _MapStop(label: 'B', point: fractions[2], phase: 0.33),
-      _MapStop(label: 'C', point: fractions[4], phase: 0.66),
+      _MapStop(label: 'A', point: points[0], trigger: 0.42),
+      _MapStop(label: 'B', point: points[2], trigger: 0.58),
+      _MapStop(label: 'C', point: points[4], trigger: 0.74),
     ];
-  }
-
-  List<Offset> _routePoints(Size size) {
-    return _MapGridLayout(size).routePoints();
   }
 
   @override
   Widget build(BuildContext context) {
-    const logoSize = 24.0;
+    const busSize = 26.0;
 
     return SizedBox(
       width: widget.width,
       height: widget.height,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) {
-            final size = Size(widget.width, widget.height);
-            final routePoints = _routePoints(size);
-            final stops = _stopsFor(size);
-            final logoCenter = _pointOnPolyline(routePoints, _controller.value);
-            final logoAngle = _segmentAngleAt(routePoints, _controller.value);
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          final progress = Curves.easeInOut.transform(_controller.value);
+          final size = Size(widget.width, widget.height);
+          final routePoints = _MapGridLayout(size).routePoints();
+          final busProgress = ((progress - 0.28) / 0.58).clamp(0.0, 1.0);
+          final busCenter = _pointOnPolyline(routePoints, busProgress);
+          final busAngle = _segmentAngleAt(routePoints, busProgress);
+          final busVisible = progress > 0.24;
 
-            return Stack(
-              clipBehavior: Clip.hardEdge,
-              children: [
-                CustomPaint(
-                  size: size,
-                  painter: _MapIllustrationPainter(
-                    progress: _controller.value,
-                    stops: stops,
-                  ),
+          return Stack(
+            clipBehavior: Clip.hardEdge,
+            children: [
+              CustomPaint(
+                size: size,
+                painter: _MapIllustrationPainter(
+                  progress: progress,
+                  stops: _stopsFor(size),
+                  busProgress: busProgress,
                 ),
+              ),
+              if (busVisible)
                 Positioned(
-                  left: logoCenter.dx - logoSize / 2,
-                  top: logoCenter.dy - logoSize / 2,
+                  left: busCenter.dx - busSize / 2,
+                  top: busCenter.dy - busSize / 2,
                   child: Transform.rotate(
-                    angle: logoAngle,
-                    child: Image.asset(
-                      'assets/images/logo_icon.png',
-                      width: logoSize,
-                      height: logoSize,
-                    ),
+                    angle: busAngle + math.pi / 2,
+                    child: _BusMarker(size: busSize),
                   ),
                 ),
-              ],
-            );
-          },
-        ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _BusMarker extends StatelessWidget {
+  const _BusMarker({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: OnboardingTheme.orange,
+        borderRadius: BorderRadius.circular(size * 0.28),
+        boxShadow: [
+          BoxShadow(
+            color: OnboardingTheme.orange.withValues(alpha: 0.55),
+            blurRadius: 12,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Icon(
+        Icons.directions_bus_rounded,
+        size: size * 0.62,
+        color: Colors.white,
       ),
     );
   }
@@ -208,47 +226,56 @@ class _MapIllustrationPainter extends CustomPainter {
   _MapIllustrationPainter({
     required this.progress,
     required this.stops,
+    required this.busProgress,
   });
 
   final double progress;
   final List<_MapStop> stops;
+  final double busProgress;
 
-  static const _blockColor = Color(0xFFC8CDD8);
-  static const _streetColor = Color(0xFFF2F4F8);
+  static const _blockColor = Color(0xFF1E2A5A);
+  static const _streetColor = Color(0xFF263366);
 
   @override
   void paint(Canvas canvas, Size size) {
     final grid = _MapGridLayout(size);
+    final routePoints = grid.routePoints();
 
     canvas.drawRect(
       Offset.zero & size,
-      Paint()..color = OnboardingTheme.background,
+      Paint()..color = OnboardingTheme.card,
     );
 
+    _drawAmbientGlow(canvas, size);
     _drawBlocks(canvas, grid);
     _drawStreets(canvas, grid);
-
-    final routePoints = grid.routePoints();
-    _drawAnimatedRoute(canvas, routePoints, progress);
+    _drawRoute(canvas, routePoints, progress);
+    _drawRouteGlow(canvas, routePoints, busProgress);
 
     for (final stop in stops) {
-      final center = Offset(
-        stop.point.dx * size.width,
-        stop.point.dy * size.height,
-      );
-      _drawAnimatedMarker(
-        canvas,
-        center,
-        stop.label,
-        size,
-        (progress + stop.phase) % 1.0,
-      );
+      final lit = busProgress >= stop.trigger;
+      final pulse = lit
+          ? 0.35 + math.sin((progress * math.pi * 4) + stop.trigger * 8) * 0.15
+          : 0.0;
+      _drawStopMarker(canvas, stop.point, stop.label, size, lit, pulse);
     }
+  }
+
+  void _drawAmbientGlow(Canvas canvas, Size size) {
+    final center = Offset(size.width * 0.5, size.height * 0.45);
+    final paint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          OnboardingTheme.orange.withValues(alpha: 0.12),
+          Colors.transparent,
+        ],
+      ).createShader(Rect.fromCircle(center: center, radius: size.width * 0.5));
+    canvas.drawRect(Offset.zero & size, paint);
   }
 
   void _drawBlocks(Canvas canvas, _MapGridLayout grid) {
     final paint = Paint()..color = _blockColor;
-    final radius = Radius.circular(grid.blockW.clamp(4.0, 8.0));
+    final radius = Radius.circular(grid.blockW.clamp(4.0, 7.0));
 
     for (final block in grid.allBlocks()) {
       canvas.drawRRect(RRect.fromRectAndRadius(block, radius), paint);
@@ -264,104 +291,84 @@ class _MapIllustrationPainter extends CustomPainter {
     }
   }
 
-  void _drawAnimatedRoute(Canvas canvas, List<Offset> points, double t) {
+  void _drawRoute(Canvas canvas, List<Offset> points, double t) {
+    final drawProgress = (t / 0.38).clamp(0.0, 1.0);
+    if (drawProgress <= 0) return;
+
     final paint = Paint()
-      ..color = OnboardingTheme.orange
-      ..strokeWidth = 2.2
+      ..color = OnboardingTheme.orange.withValues(alpha: 0.22)
+      ..strokeWidth = 5
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    const dashLength = 7.0;
-    const gapLength = 6.0;
-    final dashOffset = t * (dashLength + gapLength);
+    canvas.drawPath(_trimmedPolylinePath(points, drawProgress), paint);
 
-    for (var i = 0; i < points.length - 1; i++) {
-      _drawDashedSegment(
-        canvas,
-        points[i],
-        points[i + 1],
-        paint,
-        dashLength,
-        gapLength,
-        dashOffset,
-      );
-    }
+    final activePaint = Paint()
+      ..color = OnboardingTheme.orange
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawPath(_trimmedPolylinePath(points, drawProgress), activePaint);
   }
 
-  void _drawDashedSegment(
-    Canvas canvas,
-    Offset start,
-    Offset end,
-    Paint paint,
-    double dashLength,
-    double gapLength,
-    double dashOffset,
-  ) {
-    final delta = end - start;
-    final distance = delta.distance;
-    if (distance == 0) return;
+  void _drawRouteGlow(Canvas canvas, List<Offset> points, double busT) {
+    if (busT <= 0) return;
 
-    final direction = delta / distance;
-    var drawn = -dashOffset % (dashLength + gapLength);
-    if (drawn < 0) drawn += dashLength + gapLength;
-    var drawDash = drawn < dashLength;
+    final glowPaint = Paint()
+      ..color = OnboardingTheme.orange.withValues(alpha: 0.35)
+      ..strokeWidth = 8
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
 
-    while (drawn < distance) {
-      final segment = drawDash ? dashLength : gapLength;
-      final next = math.min(drawn + segment, distance);
-      if (drawDash && next > 0) {
-        canvas.drawLine(
-          start + direction * math.max(0, drawn),
-          start + direction * next,
-          paint,
-        );
-      }
-      drawn = next;
-      drawDash = !drawDash;
-    }
+    canvas.drawPath(_trimmedPolylinePath(points, busT), glowPaint);
   }
 
-  void _drawAnimatedMarker(
+  void _drawStopMarker(
     Canvas canvas,
     Offset center,
     String label,
     Size size,
+    bool lit,
     double pulse,
   ) {
-    final ringRadius = size.width * 0.055;
-    final pulseRadius = ringRadius * (1 + pulse * 0.85);
-    final pulseOpacity = (1 - pulse) * 0.45;
+    final ringRadius = size.width * 0.052;
+    final glowRadius = ringRadius * (1.6 + pulse);
 
-    canvas.drawCircle(
-      center,
-      pulseRadius,
-      Paint()
-        ..color = OnboardingTheme.orange.withValues(alpha: pulseOpacity)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
-    );
+    if (lit) {
+      canvas.drawCircle(
+        center,
+        glowRadius,
+        Paint()
+          ..color = OnboardingTheme.orange.withValues(alpha: 0.18 + pulse * 0.2)
+          ..style = PaintingStyle.fill,
+      );
+    }
 
     canvas.drawCircle(
       center,
       ringRadius,
       Paint()
-        ..color = OnboardingTheme.orange
+        ..color = lit
+            ? OnboardingTheme.orange
+            : OnboardingTheme.white.withValues(alpha: 0.35)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3,
+        ..strokeWidth = 2.5,
     );
 
     canvas.drawCircle(
       center,
       ringRadius * 0.42,
-      Paint()..color = Colors.white,
+      Paint()..color = lit ? Colors.white : OnboardingTheme.muted.withValues(alpha: 0.5),
     );
 
     final textPainter = TextPainter(
       text: TextSpan(
         text: label,
         style: TextStyle(
-          color: OnboardingTheme.orange,
-          fontSize: size.width * 0.055,
+          color: lit ? OnboardingTheme.orange : OnboardingTheme.muted,
+          fontSize: size.width * 0.048,
           fontWeight: FontWeight.w800,
         ),
       ),
@@ -374,26 +381,57 @@ class _MapIllustrationPainter extends CustomPainter {
     );
   }
 
+  Path _trimmedPolylinePath(List<Offset> points, double t) {
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    final segments = <double>[];
+    var total = 0.0;
+
+    for (var i = 0; i < points.length - 1; i++) {
+      final len = (points[i + 1] - points[i]).distance;
+      segments.add(len);
+      total += len;
+    }
+
+    if (total == 0) return path;
+
+    final target = total * t;
+    var walked = 0.0;
+
+    for (var i = 0; i < points.length - 1; i++) {
+      final len = segments[i];
+      if (walked + len >= target) {
+        final local = ((target - walked) / len).clamp(0.0, 1.0);
+        final end = Offset.lerp(points[i], points[i + 1], local)!;
+        path.lineTo(end.dx, end.dy);
+        break;
+      }
+      path.lineTo(points[i + 1].dx, points[i + 1].dy);
+      walked += len;
+    }
+
+    return path;
+  }
+
   @override
   bool shouldRepaint(covariant _MapIllustrationPainter oldDelegate) {
-    return oldDelegate.progress != progress;
+    return oldDelegate.progress != progress ||
+        oldDelegate.busProgress != busProgress;
   }
 }
 
 Offset _pointOnPolyline(List<Offset> points, double t) {
-  final segments = <Offset>[];
+  final segments = <double>[];
   var total = 0.0;
   for (var i = 0; i < points.length - 1; i++) {
-    final len = (points[i + 1] - points[i]).distance;
-    segments.add(Offset(total, len));
-    total += len;
+    total += (points[i + 1] - points[i]).distance;
+    segments.add(total);
   }
   if (total == 0) return points.first;
 
-  final target = (t * total) % total;
+  final target = t * total;
   var walked = 0.0;
   for (var i = 0; i < points.length - 1; i++) {
-    final len = segments[i].dy;
+    final len = (points[i + 1] - points[i]).distance;
     if (walked + len >= target) {
       final local = (target - walked) / len;
       return Offset.lerp(points[i], points[i + 1], local)!;
@@ -404,19 +442,18 @@ Offset _pointOnPolyline(List<Offset> points, double t) {
 }
 
 double _segmentAngleAt(List<Offset> points, double t) {
-  final segments = <Offset>[];
+  final segments = <double>[];
   var total = 0.0;
   for (var i = 0; i < points.length - 1; i++) {
-    final len = (points[i + 1] - points[i]).distance;
-    segments.add(Offset(total, len));
-    total += len;
+    total += (points[i + 1] - points[i]).distance;
+    segments.add(total);
   }
   if (total == 0) return 0;
 
-  final target = (t * total) % total;
+  final target = t * total;
   var walked = 0.0;
   for (var i = 0; i < points.length - 1; i++) {
-    final len = segments[i].dy;
+    final len = (points[i + 1] - points[i]).distance;
     if (walked + len >= target) {
       final delta = points[i + 1] - points[i];
       return math.atan2(delta.dy, delta.dx);

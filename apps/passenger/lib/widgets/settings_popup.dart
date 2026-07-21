@@ -4,6 +4,8 @@ import '../../l10n/app_localizations.dart';
 import '../screens/enter_phone_screen.dart';
 import '../services/user_session.dart';
 import '../widgets/onboarding/onboarding_theme.dart';
+import '../widgets/onboarding/onboarding_typography.dart';
+import '../widgets/onboarding/tardadi_logo.dart';
 
 class SettingsPopup extends StatefulWidget {
   const SettingsPopup({
@@ -74,140 +76,156 @@ class _SettingsPopupState extends State<SettingsPopup> {
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-        decoration: BoxDecoration(
-          color: const Color(0xFF181B52),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.10),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Align(
+                alignment: Alignment.center,
+                child: Opacity(
+                  opacity: 0.05,
+                  child: Image.asset(
+                    'assets/images/logo_icon.png',
+                    width: 220,
+                    height: 220,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+            decoration: BoxDecoration(
+              color: OnboardingTheme.card,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: OnboardingTheme.white.withValues(alpha: 0.10),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.22),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: OnboardingTheme.orange.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.settings_rounded,
-                    color: OnboardingTheme.orange,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    l10n.settings,
-                    style: const TextStyle(
-                      color: OnboardingTheme.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                Row(
+                  children: [
+                    const TardadiLogoIcon(size: 28),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        l10n.settings,
+                        style: OnboardingTypography.display(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
+                    GestureDetector(
+                      onTap: widget.onClose,
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          color: OnboardingTheme.white,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Divider(
+                  height: 1,
+                  color: Colors.white.withValues(alpha: 0.08),
+                ),
+                const SizedBox(height: 16),
+                _SettingsRow(
+                  icon: Icons.translate_rounded,
+                  label: l10n.languageTitle,
+                  child: _SegmentToggle<AppLanguage>(
+                    values: const [AppLanguage.english, AppLanguage.arabic],
+                    labels: [l10n.eng, l10n.ar],
+                    selected: _language,
+                    onChanged: (value) {
+                      setState(() => _language = value);
+                      UserSession.instance.setLanguage(value);
+                      widget.onChanged();
+                    },
                   ),
                 ),
-                GestureDetector(
-                  onTap: widget.onClose,
+                const SizedBox(height: 14),
+                _SettingsRow(
+                  icon: Icons.swap_horiz_rounded,
+                  label: l10n.mode,
                   child: Container(
-                    width: 28,
-                    height: 28,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.08),
-                      shape: BoxShape.circle,
+                      color: OnboardingTheme.background,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.06),
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.close_rounded,
-                      color: OnboardingTheme.white,
-                      size: 16,
+                    child: Column(
+                      children: [
+                        _ModeOption(
+                          label: l10n.business,
+                          selected: _mode == AccountType.business,
+                          onTap: () =>
+                              setState(() => _mode = AccountType.business),
+                        ),
+                        Divider(
+                          height: 16,
+                          color: Colors.white.withValues(alpha: 0.06),
+                        ),
+                        _ModeOption(
+                          label: l10n.publicMode,
+                          selected: _mode == AccountType.personal,
+                          onTap: () =>
+                              setState(() => _mode = AccountType.personal),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: _apply,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: OnboardingTheme.orange,
+                      foregroundColor: OnboardingTheme.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                    ),
+                    child: Text(
+                      l10n.save,
+                      style: OnboardingTypography.label(fontSize: 15),
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            Divider(
-              height: 1,
-              color: Colors.white.withValues(alpha: 0.08),
-            ),
-            const SizedBox(height: 16),
-            _SettingsRow(
-              icon: Icons.translate_rounded,
-              label: l10n.languageTitle,
-              child: _SegmentToggle<AppLanguage>(
-                values: const [AppLanguage.english, AppLanguage.arabic],
-                labels: [l10n.eng, l10n.ar],
-                selected: _language,
-                onChanged: (value) {
-                  setState(() => _language = value);
-                  UserSession.instance.setLanguage(value);
-                  widget.onChanged();
-                },
-              ),
-            ),
-            const SizedBox(height: 14),
-            _SettingsRow(
-              icon: Icons.swap_horiz_rounded,
-              label: l10n.mode,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: OnboardingTheme.background,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    _ModeOption(
-                      label: l10n.business,
-                      selected: _mode == AccountType.business,
-                      onTap: () =>
-                          setState(() => _mode = AccountType.business),
-                    ),
-                    Divider(
-                      height: 16,
-                      color: Colors.white.withValues(alpha: 0.06),
-                    ),
-                    _ModeOption(
-                      label: l10n.publicMode,
-                      selected: _mode == AccountType.personal,
-                      onTap: () =>
-                          setState(() => _mode = AccountType.personal),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            SizedBox(
-              height: 44,
-              child: ElevatedButton(
-                onPressed: _apply,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: OnboardingTheme.orange,
-                  foregroundColor: OnboardingTheme.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: Text(
-                  l10n.save,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -235,10 +253,10 @@ class _SettingsRow extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               label,
-              style: const TextStyle(
-                color: OnboardingTheme.muted,
+              style: OnboardingTypography.label(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
+                color: OnboardingTheme.muted,
               ),
             ),
           ],
@@ -270,6 +288,9 @@ class _SegmentToggle<T> extends StatelessWidget {
       decoration: BoxDecoration(
         color: OnboardingTheme.background,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.06),
+        ),
       ),
       child: Row(
         children: [
@@ -278,7 +299,8 @@ class _SegmentToggle<T> extends StatelessWidget {
               child: GestureDetector(
                 onTap: () => onChanged(values[i]),
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
+                  duration: OnboardingTheme.motionFast,
+                  curve: OnboardingTheme.motionCurve,
                   padding: const EdgeInsets.symmetric(vertical: 9),
                   decoration: BoxDecoration(
                     color: selected == values[i]
@@ -289,12 +311,12 @@ class _SegmentToggle<T> extends StatelessWidget {
                   alignment: Alignment.center,
                   child: Text(
                     labels[i],
-                    style: TextStyle(
+                    style: OnboardingTypography.label(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                       color: selected == values[i]
                           ? OnboardingTheme.white
                           : OnboardingTheme.muted,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
                     ),
                   ),
                 ),
@@ -355,12 +377,12 @@ class _ModeOption extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: TextStyle(
+                style: OnboardingTypography.body(
+                  fontSize: 15,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                   color: selected
                       ? OnboardingTheme.white
                       : OnboardingTheme.white.withValues(alpha: 0.82),
-                  fontSize: 15,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                 ),
               ),
             ),

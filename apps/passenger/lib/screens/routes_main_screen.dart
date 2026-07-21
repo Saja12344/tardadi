@@ -10,8 +10,8 @@ import '../services/user_session.dart';
 import '../widgets/onboarding/onboarding_scale.dart';
 import '../widgets/onboarding/onboarding_theme.dart';
 import '../widgets/route_card.dart';
-import '../widgets/tardadi_brand_video.dart';
 import '../widgets/settings_popup.dart';
+import '../widgets/tardadi_brand_video.dart';
 import 'route_map_screen.dart';
 
 class RoutesMainScreen extends StatefulWidget {
@@ -272,7 +272,12 @@ class _RoutesHeader extends StatelessWidget {
           children: [
             Align(
               alignment: AlignmentDirectional.centerStart,
-              child: TardadiBrandVideo(size: scale.s(38)),
+              child: Image.asset(
+                'assets/images/logo_icon.png',
+                width: scale.s(40),
+                height: scale.s(40),
+                fit: BoxFit.contain,
+              ),
             ),
             Text(
               title,
